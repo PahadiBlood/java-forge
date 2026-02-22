@@ -1,5 +1,6 @@
 package xyz.manojraw.model;
 
+import xyz.manojraw.exception.BookNotAvailableException;
 import xyz.manojraw.exception.BookNotFoundException;
 import xyz.manojraw.exception.DuplicateBookEntryException;
 
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Library {
+
     private final List<Book> books = new ArrayList<>();
 
     public void addBook(Book book) {
@@ -37,5 +39,24 @@ public class Library {
 
     public int countTotalBooks() {
         return books.size();
+    }
+
+    public Book borrowBook(String isbn) {
+        Book book = findByIsbn(isbn);
+        if (!book.isAvailable()) {
+            throw new BookNotAvailableException(String.format("Book for isbn '%s' not available", isbn));
+        }
+
+        book.setAvailable(false);
+        return book;
+    }
+
+    public Book returnBook(String isbn) {
+        Book book = findByIsbn(isbn);
+        if (book.isAvailable()) {
+            throw new IllegalStateException(String.format("Book for isbn '%s' never borrowed", isbn));
+        }
+        book.setAvailable(true);
+        return book;
     }
 }
