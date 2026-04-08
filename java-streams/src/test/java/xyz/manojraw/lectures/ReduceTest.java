@@ -3,7 +3,7 @@ package xyz.manojraw.lectures;
 
 import org.junit.Test;
 
-public class Lecture9 {
+public class ReduceTest {
 
   @Test
   public void reduce() throws Exception {
