@@ -9,6 +9,11 @@
 - 📘 Practice Core Java concepts with focused examples
 - 🛠 Build small topic-based projects
 - 🔍 Understand Java features in a deeper and more practical way
+- 🛠 Practice Questions with Solutions
+
+## Note:
+
+Each project has a QUESTIONS-README.md named file for questions and an exercises named folder for practical questions solutions
 
 ---
 
