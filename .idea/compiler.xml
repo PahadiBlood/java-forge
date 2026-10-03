@@ -6,8 +6,11 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="java-streams" />
+        <module name="java-core" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="multithreading-course" target="21" />
+    </bytecodeTargetLevel>
   </component>
 </project>
