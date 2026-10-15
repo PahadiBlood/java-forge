@@ -1,36 +1,33 @@
-# How do you create a singleton object in Java?
+# How do you create a singleton in Java?
 
-A singleton is one instance of a type, shared by every caller in the same class loader. Callers get it from a public access point (`getInstance()` or an enum constant). They do not call `new`.
+A singleton means one object of a type, shared by everyone in the same class loader.
 
-These notes walk the five forms in this folder, then the attacks that still produce a second object, then which form to reach for.
+Callers do not write `new`. They call `getInstance()`, or they use an enum constant.
 
-Checked on the JDK in this repo: OpenJDK 25.
+This note walks the five files in this folder. Each one fixes a problem from the one before it. Then it shows the attacks that can still make a second object.
 
-## What to prioritize
+These checks were run on OpenJDK 25.
 
-Decide in this order.
+## Which one should you use?
 
-1. **Do you need a singleton at all?** One object created in `main` (or by Spring, Guice, and so on) and passed into constructors is easier to test. A singleton is global state: every caller shares it, and a test cannot swap it without reflection or a static reset. Reach for a singleton when the thing truly is one-per-process: a cache, a connection registry, a logger facade.
+Ask in this order.
 
-2. **When you do need one, prefer the enum** — `SingletonExampleLazyViaEnum`. The JVM creates `INSTANCE` once, on first use, under the class-initialization lock. The same JVM rules block a second object from reflection, from `clone()`, and from serialization. This is the form Joshua Bloch argues for in *Effective Java*.
+1. Do you need a singleton at all? One object created in `main` and passed into constructors is easier to test. A singleton is shared by everyone. A test cannot swap it without reflection or a static reset. Use a singleton when there really is one per program, such as a cache, a connection list, or a logger.
+2. If you need one, prefer the enum: `SingletonExampleLazyViaEnum`. The JVM creates `INSTANCE` once, on first use. The same JVM rules block a second object from reflection, from `clone()`, and from save-and-load.
+3. If the type must be a normal class, prefer the holder: `SingletonExampleLazyViaHolder`. Use it when you must extend a class. An enum already extends `Enum`, so it cannot extend your class. The holder is lazy and safe for threads. Later reads take no lock. Reflection, save-and-load, and `clone` can still make a second object.
+4. Use eager (`SingletonExampleEager`) when the object is cheap and you are fine creating it as soon as the class loads.
+5. Use a synchronized `getInstance` when calls are rare and you want the shortest lazy method. The lock is taken on every call.
+6. Use double-checked locking only when you already understand `volatile`, and the holder does not fit. The file here is correct. It is easier to get wrong than the holder. For a plain singleton it does not beat the holder.
 
-3. **When the type has to be a normal class, prefer the holder** — `SingletonExampleLazyViaHolder`. Use it if you must extend a superclass (`enum` already extends `java.lang.Enum`) or a framework insists on a class. It is lazy and thread-safe, and the read path takes no lock. It is still open to reflection, serialization, and cloning. Those holes are below.
-
-4. **Eager** (`SingletonExampleEager`) when the object is cheap and you are happy to build it as soon as the class loads.
-
-5. **Synchronized `getInstance`** when the call is rare and you want the shortest correct lazy method. The lock is taken on every call.
-
-6. **Double-checked locking** only when you already understand `volatile` and you have a reason the holder does not fit. It is correct in `SingletonExampleLazyViaDoubleLocking`. It has more ways to get the threading wrong than the holder, and it gains nothing over the holder for a plain singleton.
-
-| You need | Reach for | File |
+| You need | Use this | File |
 | --- | --- | --- |
-| The default singleton | Enum | `SingletonExampleLazyViaEnum` |
+| The normal choice | Enum | `SingletonExampleLazyViaEnum` |
 | A class, created on first use | Holder | `SingletonExampleLazyViaHolder` |
-| A class, created at class load | Eager `static final` | `SingletonExampleEager` |
-| Obvious lazy code, few callers | `synchronized` method | `SingletonExampleLazyViaSynchronizedMethod` |
-| Lazy class, and you accept the memory-model rules | Double-checked locking | `SingletonExampleLazyViaDoubleLocking` |
+| A class, created when the class loads | Eager | `SingletonExampleEager` |
+| Simple lazy code, few calls | `synchronized` method | `SingletonExampleLazyViaSynchronizedMethod` |
+| A lazy class, and you accept the extra rules | Double-checked locking | `SingletonExampleLazyViaDoubleLocking` |
 
-`SingletonThreadTest` starts 8 threads on each form and prints how many distinct objects they saw. One distinct identity hash means those threads agreed. That run says nothing about reflection, serialization, or a second class loader.
+`SingletonThreadTest` starts 8 threads on each form. It prints how many different objects they saw. One object means those threads agreed. That run says nothing about reflection, save-and-load, or a second class loader.
 
 ## What every class form shares
 
@@ -47,78 +44,78 @@ public class Singleton {
 }
 ```
 
-Three rules sit under every variant:
+Three rules sit under every class form:
 
-- The constructor is private, so ordinary code outside this class cannot call `new`.
-- The instance lives in a `static` field, so there is one slot per loaded class.
-- `getInstance()` is static, so callers can reach it with no object in hand.
+- The constructor is private. Normal code outside this class cannot call `new`.
+- The object lives in a `static` field. There is one slot for each loaded class.
+- `getInstance()` is static. Callers can use it without an object in hand.
 
-The variants differ in **when** the object is built and **how** they keep two threads from building two of them.
+The forms differ in two ways: when the object is built, and how they stop two threads from building two objects.
 
-A private constructor stops `new` written in source. It does not stop `java.lang.reflect.Constructor`, serialization, or `clone()`. Those are the same for eager, the synchronized method, double-checked locking, and the holder. The enum section is where they stop.
+A private constructor stops `new` in source code. It does not stop reflection, save-and-load, or `clone()`. That is true for eager, the synchronized method, double-checked locking, and the holder. The enum is where those stop.
 
 ## 1. Eager: create it when the class loads
 
+**Issue:** If two threads both run `new`, you can get two objects. You also want the object ready as soon as the class is used.
+
+**Fix:**
+
 ```java
-public class SingletonExampleEager {
-    private static final SingletonExampleEager instance = new SingletonExampleEager();
+private static final SingletonExampleEager instance = new SingletonExampleEager();
 
-    private SingletonExampleEager() {
-    }
-
-    public static SingletonExampleEager getInstance() {
-        return instance;
-    }
+public static SingletonExampleEager getInstance() {
+    return instance;
 }
 ```
 
-The JVM initializes a class under its own lock, on one thread, before any thread is allowed to use that class. The `static final` field is assigned during that initialization. After it finishes, every thread sees `instance` already set. No `synchronized`, no `volatile`.
+The JVM sets up a class on one thread, behind its own lock, before any thread may use that class. The `static final` field is set during that work. After it finishes, every thread sees `instance` already set. You do not need `synchronized` or `volatile`.
 
-`final` stops ordinary code from writing `instance = new SingletonExampleEager()` later. Delete `final` and a method on this class can point the field at a new object. That is a second instance, and `getInstance()` will hand it out. `final` does not stop the attacks in the second half of these notes.
+`final` stops normal code from writing `instance = something else` later. If you delete `final`, a method in this class can point the field at a new object. Then `getInstance()` hands out that second object. `final` does not stop the attacks later in this note.
 
-**Drawback — you pay even when nobody calls `getInstance()`.** Touching the class for any other static member runs this constructor. A heavy constructor (file, network, big cache) runs at class-load time, including in tests that only wanted a helper on the same class. If the constructor throws, the JVM marks the class as failed and every later use throws `NoClassDefFoundError` / `ExceptionInInitializerError` for the life of that class loader.
+**Issue still open:** You pay even when nobody calls `getInstance()`. Any use of the class runs this constructor. A heavy constructor (a file, the network, a big cache) runs at class-load time. That includes a test that only wanted some other helper on the same class. If the constructor throws, the JVM marks the class as failed. Later use throws `NoClassDefFoundError` or `ExceptionInInitializerError` for the life of that class loader.
 
-**Drawback — startup order.** The constructor runs inside class initialization. If it calls another class whose initialization calls back into this one, you can deadlock on the two class-init locks, or read a field that is still at its default value.
+**Another issue:** The constructor runs while the class is starting. If it calls another class, and that class calls back into this one, the two class-start locks can deadlock. Or you can read a field that is still at its default value.
 
-Use eager when construction is cheap and the process always needs the object.
+Use eager when building the object is cheap, and the program always needs it.
 
 ## 2. Lazy: synchronized method
 
+**Issue:** The eager form builds the object even if nobody asks for it.
+
+**Fix:** Build it on the first call. `synchronized` on a static method locks the `Class` object. One thread at a time enters `getInstance()`.
+
 ```java
-public class SingletonExampleLazyViaSynchronizedMethod {
-    private static SingletonExampleLazyViaSynchronizedMethod s;
-
-    private SingletonExampleLazyViaSynchronizedMethod() {
+public static synchronized SingletonExampleLazyViaSynchronizedMethod getInstance() {
+    if (s == null) {
+        s = new SingletonExampleLazyViaSynchronizedMethod();
     }
-
-    public static synchronized SingletonExampleLazyViaSynchronizedMethod getInstance() {
-        if (s == null) {
-            s = new SingletonExampleLazyViaSynchronizedMethod();
-        }
-        return s;
-    }
+    return s;
 }
 ```
 
-`synchronized` on a static method locks the `Class` object. One thread at a time enters `getInstance()`. The first thread sees `s == null` and assigns it. The next thread waits for that lock, then sees `s` already set, because unlocking happens-before the next lock. `volatile` is unnecessary here. The monitor already publishes the write.
+The first thread sees `s == null` and sets it. The next thread waits for the lock, then sees `s` already set. The lock makes that write visible. You do not need `volatile` here.
 
-The object is created on the first call, so an unused class stays cheap.
+An unused class stays cheap.
 
-**Drawback — the lock is taken on every call.** After the object exists, the method still does nothing but `return s`, and it still acquires the class lock to do it. Callers queue behind each other. That is correct, and it is wasteful when `getInstance()` is on a hot path.
+**Issue still open:** The lock is taken on every call. After the object exists, the method only does `return s`, but it still takes the class lock. Callers wait in line. That is correct. It is wasteful when `getInstance()` is called all the time.
 
-A `Thread.sleep` inside this method makes the queue obvious and is the wrong place to demonstrate it. The sleep holds the class lock for the whole delay, so two callers serialize for two full sleeps, and every later caller pays it too. The cost that belongs to this pattern is the lock itself, not an artificial pause.
+Do not put `Thread.sleep` inside this method to "show" the wait. The sleep holds the class lock for the whole delay. The real cost of this pattern is the lock itself.
 
-Use this form when you want the code to be obvious and the method is called rarely (startup, a CLI command, a test).
+Use this form when you want the code to be obvious, and the method is called rarely.
 
 ## 3. Lazy: double-checked locking
+
+**Issue:** The synchronized method takes a lock on every call, even after the object exists.
+
+**Fix:** Check once without a lock. Only the first threads enter the lock. Check again inside the lock, because two threads can both see `s == null` before either takes the lock. Only the thread that wins the lock creates the object. The other thread enters later, sees `s` already set, and returns it.
 
 ```java
 private static volatile SingletonExampleLazyViaDoubleLocking s;
 
 public static SingletonExampleLazyViaDoubleLocking getInstance() {
-    if (s == null) {                                      // fast path, no lock
+    if (s == null) {
         synchronized (SingletonExampleLazyViaDoubleLocking.class) {
-            if (s == null) {                              // re-check under the lock
+            if (s == null) {
                 s = new SingletonExampleLazyViaDoubleLocking();
             }
         }
@@ -127,43 +124,46 @@ public static SingletonExampleLazyViaDoubleLocking getInstance() {
 }
 ```
 
-The outer `if` keeps the common case off the lock. The inner `if` is what makes it correct: two threads can both see `s == null` before either takes the lock. Only the thread that wins the lock creates the object. The other thread enters the lock afterwards, sees a non-null `s`, and returns it.
+`new` is three steps: reserve memory, run the constructor, store the reference in `s`. Without `volatile`, Java may store the reference before the constructor finishes. Another thread can skip the lock and return an object whose fields are still default values. `volatile` stops that reorder, and it makes the write visible to other cores.
 
-`new` is three steps: allocate memory, run the constructor, store the reference in `s`. Without `volatile`, the JVM is allowed to publish the reference before the constructor finishes. Another thread can pass the outer `if`, skip the lock, and return an object whose fields are still default values. `volatile` forbids that reorder and makes the write visible to the other cores. Both checks stay. `volatile` alone, with a single `if`, still lets two threads construct two objects.
+You still need both `if` checks. `volatile` alone, with one `if`, still lets two threads build two objects.
 
-The long comment on `SingletonExampleLazyViaDoubleLocking` is this same rule, written next to the field.
+**Issue still open:** This is easy to break, and it does not beat the holder. Drop `volatile`, drop the inner `if`, or lock on a different object, and the singleton is wrong again. The holder gets the same laziness from class startup, with no `volatile` to forget. Prefer the holder unless you have a real reason to keep the field on the outer class.
 
-**Drawback — it is easy to break and it does not beat the holder.** Drop `volatile`, drop the inner `if`, or lock on a different object than the one every thread synchronizes on, and the singleton is wrong again. The holder gets the same laziness from the class-initialization lock, with no `volatile` to forget. Prefer the holder unless you have a specific reason to keep the field on the outer class.
+Reflection, save-and-load, and `clone` still apply. The threading fix does not close them.
 
-**Drawback — reflection, serialization, and cloning** still apply. The threading fixes do not close them. The top comment on that file is about reflection, and it is right.
+## 4. Lazy: holder class
 
-## 4. Lazy: holder class (the class form to prefer)
+**Issue:** Double-checked locking is easy to write wrong. You want a lazy class with no lock on later reads.
+
+**Fix:** Put the object in a nested class. `Holder` is not loaded when the outer class is loaded. It is loaded the first time `getInstance()` reads `Holder.INSTANCE`.
 
 ```java
-public class SingletonExampleLazyViaHolder {
-    private SingletonExampleLazyViaHolder() {
-    }
+private static class Holder {
+    private static final SingletonExampleLazyViaHolder INSTANCE =
+            new SingletonExampleLazyViaHolder();
+}
 
-    private static class Holder {
-        private static final SingletonExampleLazyViaHolder INSTANCE =
-                new SingletonExampleLazyViaHolder();
-    }
-
-    public static SingletonExampleLazyViaHolder getInstance() {
-        return Holder.INSTANCE;
-    }
+public static SingletonExampleLazyViaHolder getInstance() {
+    return Holder.INSTANCE;
 }
 ```
 
-`Holder` is not loaded when `SingletonExampleLazyViaHolder` is loaded. It is loaded the first time `getInstance()` reads `Holder.INSTANCE`. Loading it runs the JVM's class initialization, which assigns `INSTANCE` on one thread and then publishes that value to every thread. Same guarantee as the eager form, delayed until first use.
+Loading `Holder` uses the JVM's class startup. It assigns `INSTANCE` on one thread, then every thread can see it. This is the same promise as the eager form, but it waits until the first call.
 
-No lock on the read path after that. No `volatile` on the outer class. The constructor still runs at most once per class loader, as far as ordinary calls go.
+After that, the read takes no lock. The outer class has no `volatile`. For normal calls, the constructor runs at most once per class loader.
 
-**Drawback — it is still a normal class.** A reflective constructor call, a deserialized copy, or `clone()` each produce another object. The holder only solves the threading problem. Enum solves the threading problem and those three.
+This is the class form to prefer.
 
-**Drawback — one instance, no arguments.** The constructor runs from a static field, so there is no place to pass configuration in. If the object needs a host, a port, or a path, build it in `main` and pass it down. Forcing those through static setters is shared mutable state with a singleton's name on it.
+**Issue still open:** It is still a normal class. A reflective constructor call, a saved-and-loaded copy, or `clone()` can each make another object. The holder only solves the thread problem. The enum solves the thread problem and those three.
 
-## 5. Enum (prioritize this)
+**Another issue:** The constructor runs from a static field, so you cannot pass arguments. If the object needs a host, a port, or a path, build it in `main` and pass it down. Static setters for that config are shared mutable state with a singleton name on it.
+
+## 5. Enum: the one to keep
+
+**Issue:** Every class form above can still be broken by reflection, save-and-load, or `clone`.
+
+**Fix:**
 
 ```java
 public enum SingletonExampleLazyViaEnum {
@@ -173,43 +173,41 @@ public enum SingletonExampleLazyViaEnum {
 
 Callers use `SingletonExampleLazyViaEnum.INSTANCE`.
 
-An enum constant is created when the enum class is initialized, which happens the first time anything touches the enum. With a single constant, that is first use of `INSTANCE`. The JVM does it under the class-init lock, so threads cannot each build their own.
+An enum constant is created when the enum class starts. That happens the first time anything touches the enum. With one constant, that is the first use of `INSTANCE`. The JVM does it under the class-start lock, so threads cannot each build their own.
 
-What you get on top of the holder, from the JVM, not from a guard you wrote:
+You get this from the JVM, not from a check you wrote:
 
-- **Reflection.** The real constructor is `private SingletonExampleLazyViaEnum(String name, int ordinal)`. `Constructor.newInstance(...)` throws `IllegalArgumentException: Cannot reflectively create enum objects`.
-- **Serialization.** The stream stores the constant's name. Reading it back resolves that name to the existing `INSTANCE`. A round trip returns the same reference.
-- **Cloning.** `Enum.clone()` throws `CloneNotSupportedException`. You cannot override it to return a copy; `clone()` is final on `Enum`.
+- **Reflection.** `Constructor.newInstance(...)` throws `IllegalArgumentException: Cannot reflectively create enum objects`.
+- **Save-and-load.** The saved data stores the constant's name. Reading it back finds the existing `INSTANCE`. You get the same object.
+- **Clone.** `Enum.clone()` throws `CloneNotSupportedException`. You cannot override it. `clone()` is final on `Enum`.
 
-**Drawback — an enum cannot extend a class.** It can implement interfaces. The moment you need a superclass, switch to the holder and read the attack section. You will be patching holes the enum already closed.
+**Issue still open:** An enum cannot extend a class. It can implement interfaces. If you need a superclass, use the holder and read the attack section. You will be patching holes the enum already closed.
 
-**Drawback — the type has enum API.** Callers see `name()`, `ordinal()`, `values()`, and `compareTo`. That is harmless, and it looks odd on a type that is "really" a service. If that bothers the API, the holder is the next choice, with the holes accepted or patched.
+**Another issue:** Callers see enum methods: `name()`, `ordinal()`, `values()`, and `compareTo`. That is harmless. It looks odd on a type that is really a service. If that bothers the API, the holder is the next choice.
 
-**Drawback — first touch creates it, and a rename breaks old serialized data.** Any use of the enum class initializes every constant. One constant means that is the same as lazy. Serialized form is the constant name, so renaming `INSTANCE` makes old streams fail when they are read.
+**Another issue:** The first touch creates it. Any use of the enum class creates every constant. One constant means that is the same as lazy. Saved data stores the constant name, so renaming `INSTANCE` makes old saved data fail when it is read.
 
-**Drawback — still one per class loader, not one per JVM.** Two class loaders means two copies of this enum and two `INSTANCE`s. The enum does not fix that. Nothing in this folder does.
+**Another issue:** You still get one object per class loader, not one per JVM. Two class loaders means two copies of this enum and two `INSTANCE` values. Nothing in this folder fixes that.
 
-## Attacks that produce a second object
+## Attacks that make a second object
 
-These apply to every **class** form above. The enum column is what the JVM does instead.
+These attacks work on every **class** form above. The enum is what the JVM does instead.
 
 ### Reflection
 
-`setAccessible(true)` turns off the private check. `newInstance()` calls the constructor and returns the object. It does not go through `getInstance()`, so the static field is a different reference.
+**Issue:** `setAccessible(true)` turns off the private check. `newInstance()` calls the constructor. It does not go through `getInstance()`, so you get a different object.
 
 ```java
 Constructor<SingletonExampleEager> ctor =
         SingletonExampleEager.class.getDeclaredConstructor();
 ctor.setAccessible(true);
 SingletonExampleEager extra = ctor.newInstance();
-
-SingletonExampleEager canonical = SingletonExampleEager.getInstance();
-// extra != canonical
+// extra != SingletonExampleEager.getInstance()
 ```
 
-On OpenJDK 25 that pair compares unequal. `getInstance()` keeps returning the original. Anyone holding `extra` is holding a second object. State you mutate on one is invisible on the other. That is the singleton contract broken.
+On OpenJDK 25 those two are not the same object. `getInstance()` still returns the original. Anyone holding `extra` holds a second object. A change on one is invisible on the other.
 
-A guard inside the constructor closes the obvious version of this:
+**Fix for the obvious case:** Throw if the object already exists.
 
 ```java
 private SingletonExampleEager() {
@@ -219,22 +217,26 @@ private SingletonExampleEager() {
 }
 ```
 
-For the **eager** form this works against a later reflective `newInstance()`, because class initialization has already assigned `instance`. For the **lazy** forms it is weaker:
+For the **eager** form, this works against a later reflective `newInstance()`, because class startup has already set `instance`.
 
-- Call the constructor reflectively *before* `getInstance()`. The field is still `null`, so the guard allows it. You now hold an object. `getInstance()` later builds another one and stores that. Two objects.
-- The lazy field is not `final`. Reflection can set it back to `null` (`Field.set` on a non-final static field succeeds), then `newInstance()` passes the guard again.
+For the **lazy** forms, the guard is weaker:
 
-`final` on the eager field does **not** stop `Constructor.newInstance`. It stops a different trick: `Field.set` on a `static final` field. On this JDK that set throws `IllegalAccessException` (`Can not set static final ... to null value`). The attacker does not need to clear the field. They call the constructor and keep the object it returns.
+- Call the constructor with reflection *before* `getInstance()`. The field is still `null`, so the guard allows it. You now hold an object. `getInstance()` later builds another one. Two objects.
+- The lazy field is not `final`. Reflection can set it back to `null`. Then `newInstance()` passes the guard again.
 
-An **instance** `final` field is a third, unrelated case. `Field.set` on a private final instance field such as `String message` succeeds on this JDK and overwrites it. That experiment changes one field of an existing object. It does not create a singleton, and making the field `static` is not what protects `getInstance()`.
+`final` on the eager field does not stop `Constructor.newInstance`. It stops a different trick: `Field.set` on a `static final` field. On this JDK that set throws `IllegalAccessException`. The attacker does not need to clear the field. They call the constructor and keep the object it returns.
 
-`sun.misc.Unsafe.allocateInstance` / `jdk.internal.misc.Unsafe.allocateInstance` allocates an object without running any constructor. A guard written in the constructor never sees that call. Code that can call `Unsafe` is already outside the model these patterns protect. Enum is still the form that closes the ordinary path (`Constructor`, `clone`, serialization) without a hand-written guard.
+An instance `final` field is a different case. `Field.set` on a private final instance field, such as `String message`, succeeds on this JDK and overwrites it. That changes one field of an existing object. It does not create a second singleton.
 
-### Serialization
+`Unsafe.allocateInstance` creates an object without running any constructor. A guard in the constructor never sees that call. Code that can call `Unsafe` is already outside what these patterns protect.
 
-Implement `Serializable` and the default serialization mechanism builds a new instance from the byte stream. It does not call your constructor. A round trip of the lazy class returns a different reference. The eager class behaves the same way the moment it implements `Serializable`.
+**The stronger fix:** Use the enum. It closes the normal path (`Constructor`, `clone`, save-and-load) without a hand-written guard.
 
-The patch is `readResolve()`, which the serialization machinery calls after building the new object. Return the canonical instance and the caller of `readObject` receives that instead:
+### Save and load
+
+**Issue:** If the class implements `Serializable`, the default load builds a new object from the bytes. It does not call your constructor. A round trip returns a different object. The eager class does the same thing as soon as it implements `Serializable`.
+
+**Fix:** Add `readResolve()`. Java calls it after it builds the new object. Return the real instance, and the caller receives that instead:
 
 ```java
 private Object readResolve() {
@@ -242,48 +244,48 @@ private Object readResolve() {
 }
 ```
 
-Forget `readResolve` and every deserialized copy is a new singleton. Enum serialization does this for you by resolving the constant name.
+If you forget `readResolve`, every loaded copy is a new singleton. Enum save-and-load does this for you by finding the constant name.
 
-### Cloning
+### Clone
 
-`Object.clone()` throws `CloneNotSupportedException` unless the class implements `Cloneable`. The moment it does, and `clone()` calls `super.clone()`, the result is a shallow copy: a second object, constructor not called.
+**Issue:** `Object.clone()` throws unless the class implements `Cloneable`. Once it does, and `clone()` calls `super.clone()`, the result is a second object. The constructor is not called.
 
 ```java
 public Object clone() throws CloneNotSupportedException {
-    return super.clone();   // a new instance, same field values
+    return super.clone();   // a new object, same field values
 }
 ```
 
-Leave `Cloneable` off the type. If a superclass forces you to deal with `clone()`, override it to throw, or return `getInstance()` so the caller still holds the one object. `Enum.clone()` already throws, and it is final.
+**Fix:** Do not implement `Cloneable`. If a parent class forces you to deal with `clone()`, override it to throw, or return `getInstance()` so the caller still holds the one object. `Enum.clone()` already throws, and it is final.
 
 ### A second class loader
 
-Static fields belong to the `Class` object, and each class loader has its own `Class` for the same binary name. An application server with two webapps, or a plugin loader, loads your singleton class twice. Each copy has its own `instance` or its own `INSTANCE`.
+**Issue:** Static fields belong to the `Class` object. Each class loader has its own `Class` for the same name. Two web apps, or a plugin loader, can load your class twice. Each copy has its own `instance` or its own `INSTANCE`.
 
-Threads inside one loader still agree. Across loaders they do not. Enum, holder, eager, and double-checked locking all behave this way. If you truly need one object per JVM, you have to put that object in a class loaded by the parent loader, not hunt for a cleverer `getInstance()`.
+**Fix:** Threads inside one loader still agree. Across loaders they do not. Enum, holder, eager, and double-checked locking all work this way. If you truly need one object per JVM, put that class in the parent class loader. A cleverer `getInstance()` does not fix this.
 
-### What `SingletonThreadTest` can and cannot show
+### What SingletonThreadTest can and cannot show
 
-The test calls each public access point from 8 threads and counts `System.identityHashCode`. `identityHashCode` follows the reference, so an overridden `hashCode()` cannot make two objects look like one.
+The test calls each public door from 8 threads. It counts `System.identityHashCode`. That number follows the object itself, so an overridden `hashCode()` cannot make two objects look like one.
 
-A line like `eager distinct instances: 1 (one instance)` means those eight threads observed one object. Run it when you change a form. It will stay green if you then break the class with reflection, because the test never calls `Constructor.newInstance`.
+A line like `eager distinct instances: 1` means those eight threads saw one object. Run it when you change a form. It will still say 1 if you then break the class with reflection, because the test never calls `Constructor.newInstance`.
 
 ## Patches, in the order they are worth writing
 
 Only for a **class** form. Skip all of this when you used the enum.
 
 1. Private constructor.
-2. `static final` field when the form allows it (eager, holder). Stops ordinary reassignment, and on current JDKs stops `Field.set` from clearing that slot.
-3. Constructor guard (`if (instance != null) throw`) so a reflective `newInstance()` after initialization fails. Remember the lazy hole: reflection before the field is assigned, or setting a non-final field back to `null`, still gets through.
+2. A `static final` field when the form allows it (eager, holder). This stops normal reassignment. On current JDKs it also stops `Field.set` from clearing that slot.
+3. A constructor guard (`if (instance != null) throw`) so a reflective `newInstance()` after startup fails. Remember the lazy hole: reflection before the field is set, or setting a non-final field back to `null`, still gets through.
 4. `readResolve()` if the class implements `Serializable`.
 5. Do not implement `Cloneable`. Override `clone()` to throw if a parent leaves you no choice.
 
-A class with all five patches is still behind the enum. `Unsafe.allocateInstance` skips the constructor, and a second class loader skips the field. The enum is ahead because you did not have to remember 3, 4, and 5.
+A class with all five patches is still behind the enum. `Unsafe.allocateInstance` skips the constructor. A second class loader skips the field. The enum is ahead because you did not have to remember steps 3, 4, and 5.
 
-## How to choose while reading this folder
+## How to choose while you read this folder
 
-- Interview question "write a singleton" → enum. Say why reflection, serialization, and cloning come out as the same instance. Mention the holder if they ask "what if I have to extend a class?"
-- You are about to type `synchronized` on `getInstance` → the holder is the same laziness with no lock on the later calls.
-- You are about to write double-checked locking → confirm `volatile` is on the field and both null checks are there, then ask why the holder is not enough. The answer is usually "it is enough."
-- You are about to add `Serializable` or `Cloneable` to a class singleton → add `readResolve`, or switch the type to an enum before those interfaces go on.
-- The object needs constructor arguments → it is not a singleton pattern problem. Create it once at the top of the program and pass it in.
+- The interview question is "write a singleton". Use the enum. Say why reflection, save-and-load, and `clone` still return the same object. Mention the holder if they ask "what if I must extend a class?"
+- You are about to type `synchronized` on `getInstance`. The holder is the same laziness, with no lock on the later calls.
+- You are about to write double-checked locking. Check that `volatile` is on the field and both null checks are there. Then ask why the holder is not enough. The answer is usually "it is enough."
+- You are about to add `Serializable` or `Cloneable` to a class singleton. Add `readResolve`, or switch the type to an enum before those interfaces go on.
+- The object needs constructor arguments. This is not a singleton problem. Create it once at the top of the program and pass it in.
