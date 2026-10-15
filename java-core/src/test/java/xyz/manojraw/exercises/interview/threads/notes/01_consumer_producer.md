@@ -1,263 +1,195 @@
-# Java Producer-Consumer with wait() / notify()
+# Producer and consumer with wait() and notify()
 
-*Concepts, bugs we hit, and how each was fixed*
+This note is the old way. You write the queue, the lock, `wait()`, and `notify()` yourself.
 
-Exercise file: `xyz.manojraw.exercises.interview.threads.ConsumerProducerTest`. The final code below was compiled and run three times (Java 21) and completed all four orders each time. The two buggy structures in section 8 were also run and their real output is shown.
+The code is `ConsumerProducerTest`. The final shape was compiled and run three times on Java 21. All four orders finished each time. The two broken loop shapes in the main lesson were also run. Their real output is below.
 
+Read this note first. The next note, `02_array_blocking_queue.md`, is the better fix.
 
-## 1. The goal
+## The goal
 
-Simulate a coffee shop. A **producer** (`placeOrder`) puts orders on a queue. A **consumer** (`processOrder`) takes them off and brews each one on its own thread. Only `synchronized`, `wait()`, `notify()` and real threads are used.
+Think of a coffee shop.
 
-- Producer and consumer never call each other. The shared queue is the only link.
-- The consumer runs on its own long-lived background thread, started once, looping forever.
-- Each order is brewed on its own thread (3 second sleep) so orders do not block each other.
+- The **producer** is `placeOrder`. It puts an order on a queue.
+- The **consumer** is `processOrder`. It takes orders off the queue and brews them.
 
+The two sides never call each other. The shared queue is the only link.
 
-## 2. Final clean code
+The consumer is one background thread. It starts once and loops forever. Each order is brewed on its own thread, with a 3 second sleep, so one order does not block the next.
 
-Changes from your last version: the queue is renamed `orders` (it no longer clashes with the local list in `main`), the task is built outside the lock, the confirmation print is outside the lock, interrupts are restored, and the consumer thread has a name. The logic is the same as yours.
+The program does not stop by itself. The consumer thread never returns. Stop it by hand.
+
+## The shape to keep
+
+The full class is `ConsumerProducerTest`. These are the two parts that matter.
+
+Producer. Build the work outside the lock. Inside the lock, only add and wake:
 
 ```java
-package xyz.manojraw.exercises.interview.threads;
-
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Queue;
-import java.util.UUID;
-
-/**
- * Producer-consumer coffee shop using synchronized + wait()/notify().
- *
- * Producer : placeOrder()   -> adds a task to the queue, then notifies.
- * Consumer : processOrder() -> waits for tasks, drains the queue, starts one thread per task.
- * The two sides never call each other. The shared queue is their only link.
- */
-public class ConsumerProducerTest {
-
-    // Shared queue AND the lock object. Both sides must synchronize on this same instance.
-    private static final Queue<Runnable> orders = new ArrayDeque<>();
-
-    /** Producer side. Runs on whichever thread calls it (main, in this demo). */
-    public String placeOrder(String name) {
-        // Built outside the lock: the lock should protect only the queue, nothing else.
-        Runnable brewTask = () -> {
-            try {
-                // Naming inside the task avoids the "start() returns before setName()" race.
-                Thread.currentThread().setName(name);
-                Thread.sleep(3000); // simulate brewing
-                System.out.println("Order is completed for customer " + name);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        };
-
-        synchronized (orders) {          // must be the SAME object the consumer waits on
-            orders.add(brewTask);
-            orders.notify();             // wake the consumer; lock is released only when this block ends
-        }
-        System.out.println("Coffee ordered successfully for customer " + name);
-        return UUID.randomUUID().toString();
-    }
-
-    /** Consumer side. Meant to run forever on its own dedicated thread. */
-    public void processOrder() throws InterruptedException {
-        while (true) {                       // OUTSIDE synchronized: lock is released and re-acquired each pass
-            synchronized (orders) {
-                while (orders.isEmpty()) {   // while, not if: re-check after every wake-up
-                    orders.wait();           // releases the lock while parked
-                }
-                while (!orders.isEmpty()) {  // drain everything that is queued
-                    Thread.startVirtualThread(orders.poll()); // already started: do NOT call start() again
-                }
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        ConsumerProducerTest shop = new ConsumerProducerTest();
-
-        // Consumer must be a NON-daemon platform thread: it keeps the JVM alive
-        // while the (always-daemon) virtual threads finish brewing.
-        Thread consumer = new Thread(() -> {
-            try {
-                shop.processOrder();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "order-consumer");
-        consumer.start();
-
-        System.out.println("Order place started");
-        List.of("Manoj", "Yoga", "Chamal", "GoGo").forEach(shop::placeOrder);
-        // main ends here; the program keeps running because the consumer never returns.
-    }
+synchronized (orders) {
+    orders.add(brewTask);
+    orders.notify();
 }
 ```
 
-Expected output (order of the two groups is stable; the order of lines inside a group can vary):
-
-```text
-Order place started
-Coffee ordered successfully for customer Manoj
-Coffee ordered successfully for customer Yoga
-Coffee ordered successfully for customer Chamal
-Coffee ordered successfully for customer GoGo
-Order is completed for customer Manoj
-Order is completed for customer Yoga
-Order is completed for customer Chamal
-Order is completed for customer GoGo
-```
-
-> **Note:** The program never exits on its own. The consumer is a non-daemon thread stuck in `while (true)`. Stop it manually, or add a shutdown flag if you want a clean exit.
-
-
-## 3. Design rules that came out of the discussion
-
-
-### 3.1 Producer and consumer must be independent
-
-**Problem.** Early drafts had `placeOrder` trigger processing directly, or branched on queue size. That couples the two sides and reintroduces race conditions.
-
-**Fix.** `placeOrder` only adds and notifies. `processOrder` only waits and drains. Nothing else connects them.
-
-
-### 3.2 The consumer is one dedicated background thread
-
-**Problem.** Starting a consumer per order wastes threads and loses the point of the pattern.
-
-**Fix.** Start one consumer thread in `main`, once. It loops forever. Calling `processOrder()` directly on `main` would block `main` forever inside `wait()`.
-
-
-### 3.3 wait() and notify() need synchronized on the same object
-
-**Problem.** `IllegalMonitorStateException`. A `synchronized` method locks `this`, but the code called `wait()` on the queue. A bare `wait()` also means `this.wait()`.
-
-**Fix.** Use `synchronized (orders)` blocks in both methods and call `orders.wait()` / `orders.notify()`. Rule: you can only call `x.wait()` or `x.notify()` while holding `x`'s lock.
-
-
-### 3.4 Why a synchronized block and not a synchronized method
-
-- A synchronized method always locks `this` (or the Class for static). It cannot lock a specific shared object.
-- wait/notify needed the queue as the lock, so a block was required.
-- A block also lets you lock only the critical section, not the whole method.
-
-
-### 3.5 wait() goes in a while loop, never an if
-
-**Problem.** After waking, another thread may already have taken the item (competing consumers), or the wake-up may be spurious. An `if` would continue on a false assumption.
-
-**Fix.** `while (orders.isEmpty()) orders.wait();` re-checks the condition every time the thread wakes.
-
-
-## 4. How the lock really behaves
-
-| Action | Releases the lock? | What actually happens |
-|---|---|---|
-| wait() | Yes | Thread parks and gives the lock up. On wake it must re-acquire the lock before continuing. |
-| notify() | No | Only marks one waiter as eligible. Notifier keeps the lock until its synchronized block ends. |
-| Thread.sleep() | No | Holder keeps the lock. Every other thread wanting it blocks. |
-| End of synchronized block | Yes | Lock is free. Waiters and other threads compete for it. |
-| thread.start() | n/a | Returns immediately. The new thread runs later, concurrently. |
-
-
-### 4.1 Who is the holder?
-
-- The lock belongs to the **object** (`orders`). The **thread** is the holder. At any moment: one holder or none.
-- Here the holder alternates between `th` (consumer) and `main` (producer). It does not matter which method runs; only which thread currently owns the monitor.
-- `orders` is `static`, so there is exactly one object and one lock shared by every thread. With a non-static field and two `ConsumerProducerTest` instances, each would have its own queue and its own lock, and nothing would be shared.
-
-
-### 4.2 Who gets the lock next?
-
-When `main` leaves its synchronized block, both `main` (placing the next order) and `th` (woken, wanting to resume) compete for it. The JVM scheduler decides. This is non-deterministic ordering, not a data race: `synchronized` guarantees only one thread is inside at a time, so nothing is corrupted or lost. Only the order of console lines can change. (Your metro-seat analogy fits: several people eye one seat, one gets it, nobody is wronged.)
-
-
-### 4.3 The sleep-inside-the-lock experiment
-
-You added a long `Thread.sleep` inside the consumer's synchronized block. Because sleep does not release the lock, `placeOrder` on `main` could not even enter its own synchronized block until the sleep ended. That is why orders appeared delayed, and why this sleep could never create the "gap" you were trying to engineer: while the consumer holds the lock, nobody can add to the queue.
-
-> **Note:** Rule of thumb: keep as little as possible inside a synchronized block. Anything slow or stuck in there freezes every thread that needs the same lock.
-
-
-## 5. The thread-name and join problem
-
-**Problem.** The completion print used `Thread.currentThread().getName()` from the consumer thread, so it printed "Thread-0" instead of the customer name. Also `t.start()` returns immediately, so `setName` in the new thread may not have run yet.
-
-**Options discussed.** `t.join()` waits for the worker to finish (correct but blocks the consumer). `Thread.sleep` to "wait long enough" is fragile and only acceptable in throwaway tests.
-
-**Fix used.** Do the naming and the "order completed" print inside the task itself, after its own sleep. No `join()` needed, and the consumer never blocks on brewing.
-
-
-## 6. Lambdas, captured variables and effectively final
-
-- A lambda is just code packaged as an object. It runs on whatever thread calls it. `r.run()` runs on the current thread; only `new Thread(r).start()` or `Thread.startVirtualThread(r)` moves it to another thread.
-- `list.forEach(lambda)` runs synchronously on the calling thread. Parallelism only appears with `.parallelStream()` / `.parallel()`.
-- Local variables captured by a lambda are **copied at lambda creation time**. Reassigning the variable later would leave the lambda with a stale copy, so Java requires captured locals to be final or effectively final.
-- For objects the copied value is the **reference**. The variable cannot be re-pointed, but the object's contents can still change. That is allowed by the compiler and is a real shared-mutable-state hazard across threads.
-- Fields (static or instance) are not copied. The lambda reads their current value through the object or class, so they have no such restriction. That is why `orders` works inside the Runnable.
-- The check is compile-time and uniform. Even `x++` after a synchronous `forEach` that used `x` is rejected, because the compiler does not analyse how each receiving method uses the lambda (it might store it and run it later on another thread).
-
-
-## 7. Daemon threads and virtual threads
-
-- The JVM exits when no **non-daemon** thread is alive. Daemon threads do not keep it alive and are cut off abruptly at exit.
-- A virtual thread is a lightweight thread managed by the JVM. Daemon-ness is a separate flag.
-- Virtual threads are **always daemon**. `setDaemon(false)` cannot change that (JEP 444; calling it throws `IllegalArgumentException`).
-- `main` finishes almost instantly. If the consumer were also a daemon or virtual thread, the JVM would exit right away and orders would be cut off.
-- So the consumer `th` stays a normal platform thread (non-daemon). It keeps the JVM alive while the virtual brewing threads finish.
-- Virtual threads suit the brew tasks well: they mostly sleep, and blocked virtual threads are cheap.
-
-
-### 7.1 The double-start bug
-
-```java
-Thread.startVirtualThread(orders.poll()).start();   // WRONG
-```
-
-`startVirtualThread` already starts the thread. The extra `start()` throws `IllegalThreadStateException`, which the lambda in `main` does not catch (it only catches `InterruptedException`). The consumer dies after the first order, the same symptom as the structural bug below.
-
-```java
-Thread.startVirtualThread(orders.poll());          // correct
-```
-
-
-## 8. The structural bug (the main lesson)
-
-
-### 8.1 Original shape (no outer loop)
-
-```java
-synchronized (customers) {
-    while (customers.isEmpty()) {
-        customers.wait();
-        while (customers.iterator().hasNext()) { ... poll and start ... }
-    }
-}   // method returns here
-```
-
-**What goes wrong.** After one wake-up and drain, the outer condition is re-checked. If it is true the thread waits again (fine). But if the queue is non-empty when the check happens, the loop exits and `processOrder()` **returns**. The consumer thread is dead. Any later order is added to the queue and nobody ever processes it.
-
-Real output when orders exist before the consumer reaches the wait, then a later order arrives:
-
-```text
-ordered Manoj
-ordered Yoga
-[consumerB method RETURNED - consumer thread is dead]
---- later order arrives
-ordered Chamal
-consumer alive? false
-```
-
-
-### 8.2 Adding while(true) is not enough if the drain stays nested
+Consumer. The forever loop is outside the lock. Inside the lock, wait first, then drain:
 
 ```java
 while (true) {
     synchronized (orders) {
         while (orders.isEmpty()) {
             orders.wait();
-            while (!orders.isEmpty()) {          // drain is INSIDE the wait loop
+        }
+        while (!orders.isEmpty()) {
+            Thread.startVirtualThread(orders.poll());
+        }
+    }
+}
+```
+
+`orders` is an `ArrayDeque`. It is both the queue and the lock. Both sides must use this same object.
+
+A normal run prints the four "ordered" lines, then the four "completed" lines. The lines inside each group can swap. The program then keeps running.
+
+## 1. The two sides called each other
+
+**Issue:** Early drafts made `placeOrder` start the work itself, or they checked the queue size and then decided what to do. The two sides were tied together. That brings races back.
+
+**Fix:** `placeOrder` only adds and calls `notify`. `processOrder` only waits and drains. Nothing else connects them.
+
+## 2. A new consumer thread for every order
+
+**Issue:** Starting one consumer per order wastes threads. It also misses the point. One consumer should serve the queue.
+
+**Fix:** Start one consumer thread in `main`, once. It loops forever.
+
+Do not call `processOrder()` on `main`. `main` would sit inside `wait()` forever and never place the orders.
+
+## 3. wait() and notify() used the wrong lock
+
+**Issue:** This throws `IllegalMonitorStateException`. A `synchronized` method locks `this`. The code called `wait()` on the queue. A bare `wait()` means `this.wait()`. You may call `x.wait()` or `x.notify()` only while you hold the lock on `x`.
+
+**Fix:** Use `synchronized (orders)` in both methods. Call `orders.wait()` and `orders.notify()`.
+
+A `synchronized` method always locks `this` (or the class, if the method is static). It cannot lock the queue. A block can lock the queue, and it can cover only the few lines that touch the queue.
+
+## 4. wait() was inside an if
+
+**Issue:** After a thread wakes up, the item may already be gone. Another consumer may have taken it. Or the thread woke up even though nobody called `notify`. An `if` would continue as if the queue had an item.
+
+**Fix:** Use a `while` loop. Check the queue again every time the thread wakes:
+
+```java
+while (orders.isEmpty()) {
+    orders.wait();
+}
+```
+
+## 5. What the lock actually does
+
+The lock belongs to the object `orders`. A thread holds it. At one moment, one thread holds it, or nobody does.
+
+Here the holder switches between `main` (the producer) and the consumer thread. The method name does not matter. What matters is which thread owns the lock.
+
+`orders` is `static`, so there is one queue and one lock. If the field were not static, two shop objects would have two queues. They would not share anything.
+
+| Action | Does it give the lock up? | What happens |
+| --- | --- | --- |
+| `wait()` | Yes | The thread sleeps and gives the lock up. When it wakes, it must get the lock again before it continues |
+| `notify()` | No | It marks one waiting thread as ready. The caller keeps the lock until the block ends |
+| `Thread.sleep()` | No | The holder keeps the lock. Everyone else who wants it waits |
+| End of the `synchronized` block | Yes | The lock is free. Waiting threads compete for it |
+| `thread.start()` | Not about the lock | It returns at once. The new thread runs later |
+
+**Issue:** A long `Thread.sleep` inside the consumer's `synchronized` block looks like a pause. It is not a useful pause. Sleep does not give the lock up. `placeOrder` cannot enter its own block until the sleep ends. Nobody can add to the queue while the consumer holds the lock.
+
+**Fix:** Keep the `synchronized` block short. Do slow work outside it. Brewing sleeps inside the task, after the task has left the lock.
+
+When `main` leaves its block, `main` and the consumer both want the lock. The JVM picks one. Only one is inside at a time, so no order is lost. Only the order of the printed lines can change.
+
+## 6. The completion line printed the wrong name
+
+**Issue:** The "order completed" print used the consumer thread's name, so it printed `Thread-0` instead of the customer name. `t.start()` also returns at once, so `setName` in the new thread may not have run yet. `t.join()` would wait for the brew to finish, but then the consumer is blocked. `Thread.sleep` to "wait long enough" is fragile.
+
+**Fix:** Set the name and print "order completed" inside the brew task, after its own sleep. The consumer does not wait for the brew.
+
+## 7. A lambda and a captured variable
+
+A lambda is code packed as an object. It runs on the thread that calls it. `startVirtualThread` is what moves it to another thread. `forEach` runs on the current thread.
+
+**Issue:** A lambda copies a local variable when the lambda is created. If you change that variable later, the lambda would still have the old copy. Java rejects that. The variable must be final, or it must never be assigned again.
+
+**Fix:** Do not reassign the local. For an object, the copy is the reference. You cannot point the variable at a new object, but you can still change the object's fields. That is allowed, and it is a real shared-data hazard.
+
+Fields are not copied. The lambda reads the current field. That is why `orders` is fine inside the task.
+
+The check is at compile time. Even `x++` after a normal `forEach` that used `x` is rejected. The compiler does not try to guess whether the lambda runs now or later.
+
+## 8. The program exited before the coffee was ready
+
+**Issue:** The JVM exits when no normal (non-daemon) thread is still alive. Daemon threads do not keep it alive. They are cut off.
+
+A virtual thread is a light thread managed by the JVM. Virtual threads are always daemon. `setDaemon(false)` throws `IllegalArgumentException`.
+
+`main` finishes almost at once. If the consumer were also a daemon or a virtual thread, the JVM would exit and the orders would be cut off.
+
+**Fix:** Keep the consumer as a normal platform thread. It keeps the JVM alive while the virtual brew threads finish. Virtual threads are a good fit for the brew tasks, because those tasks mostly sleep.
+
+## 9. start() was called twice
+
+**Issue:**
+
+```java
+Thread.startVirtualThread(orders.poll()).start();   // wrong
+```
+
+`startVirtualThread` already starts the thread. The extra `start()` throws `IllegalThreadStateException`. The lambda in `main` does not catch that. The consumer dies after the first order. That looks like the loop bug in the next section.
+
+**Fix:**
+
+```java
+Thread.startVirtualThread(orders.poll());
+```
+
+## 10. The consumer died, or it spun and did no work
+
+This is the main lesson.
+
+### Wrong shape: no outer loop
+
+```java
+synchronized (customers) {
+    while (customers.isEmpty()) {
+        customers.wait();
+        while (customers.iterator().hasNext()) {
+            // poll and start
+        }
+    }
+}
+// the method returns here
+```
+
+**Issue:** After one wake-up and one drain, the outer check runs again. If the queue is empty, the thread waits again. That part is fine. If the queue is not empty when the check happens, the loop ends and `processOrder()` returns. The consumer thread is dead. Later orders sit in the queue and nobody takes them.
+
+Real output when orders exist before the consumer reaches `wait`, and a later order arrives:
+
+```text
+ordered Manoj
+ordered Yoga
+[consumer method RETURNED - consumer thread is dead]
+--- later order arrives
+ordered Chamal
+consumer alive? false
+```
+
+### Still wrong: while(true), but the drain is inside the wait loop
+
+```java
+while (true) {
+    synchronized (orders) {
+        while (orders.isEmpty()) {
+            orders.wait();
+            while (!orders.isEmpty()) {          // drain is inside the wait loop
                 Thread.startVirtualThread(orders.poll());
             }
         }
@@ -265,23 +197,24 @@ while (true) {
 }
 ```
 
-Now the thread never dies, but the drain only runs after a `wait()`. If the queue is already non-empty when the consumer arrives, `isEmpty()` is false, the body is skipped, and `while (true)` spins forever without processing anything (a busy loop holding and releasing the lock).
+**Issue:** The thread no longer dies. But the drain runs only after a `wait()`. If the queue already has items when the consumer arrives, `isEmpty()` is false, the body is skipped, and `while (true)` spins forever. It holds and releases the lock, and it never brews.
 
 ```text
 ordered Manoj
 ordered Yoga
 --- later order arrives
 ordered Chamal
-consumer alive? true        <- alive, but not one "completed" line was ever printed
+consumer alive? true
 ```
 
+No "completed" line is printed.
 
-### 8.3 The fix
+### The fix
 
 ```java
 while (true) {
     synchronized (orders) {
-        while (orders.isEmpty()) {               // this loop ONLY waits
+        while (orders.isEmpty()) {               // this loop only waits
             orders.wait();
         }
         while (!orders.isEmpty()) {              // draining is a separate step
@@ -291,31 +224,25 @@ while (true) {
 }
 ```
 
-- The inner loop only waits. Draining is a separate step after it, so it runs whether or not a wait was needed.
-- `while (true)` is **outside** `synchronized`. The lock is acquired and released fresh each pass, so the producer can always get in between passes. If `while (true)` were inside the block, the consumer would hold the lock forever and `placeOrder` could never add or notify.
-- The outer loop exists to keep the consumer alive as a long-running background worker.
+- The inner loop only waits. The drain is a separate step, so it runs even when no wait was needed.
+- `while (true)` is **outside** `synchronized`. The lock is taken and given up on every pass, so the producer can get in. If `while (true)` were inside the block, the consumer would hold the lock forever. `placeOrder` could never add or notify.
+- The outer loop keeps the consumer alive.
 
+**Why a slow test looked fine:** If you place one order at a time, and the consumer is already waiting, every pass is wait, then drain, then wait again. The broken shapes fail when the queue is not empty at the moment of the check. For example, orders placed before the consumer starts, or a method that returns. The slow test never made that happen.
 
-### 8.4 Why your staggered-sleep test passed
+**Other tries that were rejected:**
 
-With orders placed one at a time after the consumer was already waiting, every pass went wait -> drain -> queue empty -> wait again. The buggy shape only fails when the queue is non-empty at the moment the consumer checks, for example orders placed before it starts, or a method that returns. The original test never produced that situation, so it looked fine.
+- Let the producer decide whether to start the consumer based on queue size. That ties the two sides together again and adds races.
+- Let `processOrder()` call itself. The stack grows until `StackOverflowError`.
+- Call `processOrder` from `placeOrder` just to force the failure. That removes the wait/notify design you are testing.
 
+The consumer holds the lock through the drain and the next check. The producer cannot add an item in that gap. There is no tiny race there. The real defect is the loop shape above.
 
-### 8.5 Alternatives you tried and why they were rejected
+## 11. Another fix: ReentrantLock
 
-- **Producer decides whether to trigger the consumer based on queue size.** Re-couples the two sides and adds races.
-- **`processOrder()` calling itself recursively.** Unbounded recursion ends in `StackOverflowError`.
-- **Calling `processOrder` from `placeOrder` to force the failure.** That removes the wait/notify design you are testing.
+**Issue:** `synchronized` is tied to a block. It always unlocks at the closing brace. You cannot ask "try this lock", set a timeout, or have two separate wait lists on one lock.
 
-
-### 8.6 Correction to an earlier claim
-
-> **Note:** Earlier in the session a "narrow race window" was suggested: a notify firing between the end of the drain and the next wait(). That window does not exist. The consumer holds the lock continuously through the drain and the re-check, so `placeOrder` cannot add anything in between. That is why you could not reproduce it. The real defect is the structure in 8.1 and 8.2, which is deterministic once the queue is non-empty at the check.
-
-
-## 9. ReentrantLock and Condition (next step, sketch only)
-
-`ReentrantLock` is an object, not a property of a class. Create **one** shared instance; both producer and consumer must use that same instance. It takes no constructor argument and does not "lock on" `orders`. Use `lock.newCondition()` instead of `wait()`/`notify()`.
+**Fix:** `ReentrantLock` is an object you create. Both sides must use the same instance. It does not lock on `orders`. You use `lock.newCondition()` instead of `wait()` and `notify()`.
 
 ```java
 private static final ReentrantLock lock = new ReentrantLock();
@@ -325,50 +252,53 @@ private static final Condition notEmpty = lock.newCondition();
 lock.lock();
 try {
     orders.add(task);
-    notEmpty.signal();          // replaces orders.notify()
+    notEmpty.signal();
 } finally {
-    lock.unlock();              // always in finally
+    lock.unlock();
 }
 
 // consumer
 while (true) {
     lock.lock();
     try {
-        while (orders.isEmpty()) notEmpty.await();   // replaces orders.wait()
-        while (!orders.isEmpty()) Thread.startVirtualThread(orders.poll());
+        while (orders.isEmpty()) {
+            notEmpty.await();
+        }
+        while (!orders.isEmpty()) {
+            Thread.startVirtualThread(orders.poll());
+        }
     } finally {
         lock.unlock();
     }
 }
 ```
 
-- `unlock()` must be in `finally`, because there is no automatic release at a closing brace like `synchronized` gives.
-- Gains over `synchronized`: `tryLock()`, timeouts, interruptible locking, fairness, and several Conditions per lock.
-- It does not change correctness here: the same rule applies, check the condition in a `while` loop under the lock.
+`unlock()` must be in `finally`. There is no automatic unlock at a closing brace.
 
-> **Note:** This sketch was not compiled or run. Treat it as a starting point for your own implementation.
+You also get `tryLock()`, timeouts, interruptible locking, a fair lock, and more than one `Condition` on the same lock. The rule does not change: check the condition in a `while` loop while you hold the lock.
 
+This sketch was not compiled or run. Use it as a starting point.
 
-## 10. Known limits of this demo
+The queue in the next note already uses this idea inside `ArrayBlockingQueue`. You usually call `put` and `take` instead of writing this yourself.
 
-- `notify()` wakes one waiter. With a single consumer that is fine. With several consumers prefer `notifyAll()` or a separate Condition.
-- The queue is unbounded and one virtual thread is started per order. A real system would cap concurrency (a pool or semaphore).
-- No shutdown mechanism: add a volatile flag or interrupt the consumer.
-- Interrupts are restored with `Thread.currentThread().interrupt()` rather than swallowed.
+## What this demo still does not do
 
+- `notify()` wakes one waiter. One consumer is fine. Several consumers should use `notifyAll()`, or a separate `Condition`.
+- The queue has no size limit. A fast producer can grow it forever. One virtual thread starts per order. A real system would cap that.
+- There is no clean stop. Add a flag, or interrupt the consumer.
+- An interrupt is put back with `Thread.currentThread().interrupt()`. It is not ignored.
 
-## 11. Quick checklist
+## Checklist
 
-- Producer and consumer share only the queue.
-- Same lock object on both sides; wait/notify called while holding it.
-- Always `while (condition) wait();`, never `if`.
-- Wait loop only waits; drain is a separate step.
-- `while (true)` outside the synchronized block.
-- Never `start()` a thread that `startVirtualThread` already started.
-- Keep one non-daemon thread alive until work finishes.
-- Keep synchronized blocks short; no sleeping or blocking inside.
+- The producer and the consumer share only the queue.
+- Both sides lock the same object. `wait` and `notify` run while that lock is held.
+- Always `while (condition) wait();`. Never `if`.
+- The wait loop only waits. The drain is a separate step.
+- `while (true)` is outside the `synchronized` block.
+- Do not call `start()` on a thread that `startVirtualThread` already started.
+- Keep one normal thread alive until the work is done.
+- Keep `synchronized` blocks short. Do not sleep inside them.
 
+## Next note
 
-## 12. The bounded queue to use after this one
-
-`ArrayBlockingQueue` already contains the lock, the full/empty waits, and the bound this demo leaves to you. The comparison, and the file that uses it, is `02_array_blocking_queue.md`.
+`ArrayBlockingQueue` already has the lock, the full and empty waits, and a size limit. That comparison is `02_array_blocking_queue.md`.
