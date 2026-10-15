@@ -1,59 +1,62 @@
 # How do you make a class immutable in Java?
 
-An immutable object publishes its state once, in the constructor. After that, normal callers can read the state and cannot change it. `int` and `String` already work that way. A `List` does not: the variable can point at a list the caller still holds, and the list itself accepts `add`.
+Immutable means this: after the constructor finishes, normal code can read the object, but it cannot change it.
 
-`ImmutableViaClassTest` walks that in order. Each nested type closes the leak from the previous type and leaves the next leak open. `immutable.Main` calls every `demo`, then the record chain in `ImmutableViaRecordTest`.
+`int` and `String` already work that way. A `List` does not. The list still accepts `add`. The caller may still hold the same list.
 
-Checked on the JDK in this repo: OpenJDK 25.0.2.
+`ImmutableViaClassTest` shows this one step at a time. Each class fixes the problem from the class before it. Each class also leaves the next problem open.
 
-## What to prioritize
+Run `immutable.Main`. It runs every class demo, then the record demos.
 
-1. **Prefer a record when every component is already immutable.** `ImmutableViaRecordTest.CopiedIntegerList` is `int`, `String`, and `List<Integer>`. `Integer` has no setter. The compact constructor does `uniqueNumbers = List.copyOf(uniqueNumbers)`. The record is final, the field is private, and `uniqueNumbers()` returns that immutable list. Caller `add` stays on the caller's list. `add` on the accessor throws `UnsupportedOperationException`. `List.copyOf` also rejects a null list and a null element. The record walk is `notes/02_immutable_via_record.md`.
+These checks were run on OpenJDK 25.0.2.
 
-2. **When a component is mutable, copy the values, then store an immutable list.** `SharesMutableElements` is final and uses `List.copyOf`, and `setLabel` on a `Marker` still changes the object, because `List.copyOf` copies the list and keeps the same element objects. `DeepCopiedMarkers` reads each label into a `String` at construction time and stores `List.copyOf` of those strings. Later `setLabel` writes the caller's `Marker` only.
+## Which one should you keep?
 
-3. **Use a final class when a record does not fit** (a framework wants a particular superclass, or you want named getters). `FinalIntegerList` is that shape: `final` class, `private final` fields, `List.copyOf` in the constructor, public `clone()` that throws `CloneNotSupportedException`. Build a second instance with the constructor. `new FinalIntegerList(existing.getId(), existing.getName(), existing.getUniqueNumbers())` is safe, because the constructor copies again.
+1. Prefer a record when every value is already safe to share. That means `int`, `String`, and `Integer`. The record to keep is `CopiedIntegerList`. Read `02_immutable_via_record.md`.
+2. If an item inside the list has a setter, copy the values first, then store them. That class is `DeepCopiedMarkers`.
+3. If you must use a normal class, keep `FinalIntegerList`. A record cannot extend some other class.
+4. Store `List.copyOf(...)` in the field, and return that field. `Collections.unmodifiableList` is only a window over another list. It is a good middle step. It is a bad place to stop. Anyone who still holds the real `ArrayList` can change every window.
 
-4. **Stop at `List.copyOf` stored in the field.** Return that field from the getter. `Collections.unmodifiableList` is a view over some other list. It is the right intermediate fix in `UnmodifiableGetterShallowClone`. It is the wrong place to stop, because anything that still holds the backing `ArrayList` updates every view.
+| What is still wrong | The class that fixes it |
+| --- | --- |
+| The constructor stores the caller's list. `input.add(...)` changes the object | `CopiesListInConstructor` |
+| The getter returns the real `ArrayList`. `getUniqueNumbers().add(...)` changes the object | `UnmodifiableGetterShallowClone` |
+| `clone()` shares that `ArrayList`. A write shows up on both objects | `CloneDisabledNotFinal` |
+| The class is open. A child class can add a setter | `FinalIntegerList` |
+| An item in the list has a setter. `marker.setLabel(...)` changes the object | `DeepCopiedMarkers` |
+| Reflection can replace a private final field on a normal class | No class in this file fully stops that. See the last section |
 
-| Situation | What still changes the object | Type that closes it |
-| --- | --- | --- |
-| Constructor stores the caller's list | `input.add(...)` | `CopiesListInConstructor` |
-| Getter returns the internal `ArrayList` | `getUniqueNumbers().add(...)` | `UnmodifiableGetterShallowClone` |
-| `clone()` copies the list reference | a write to that shared `ArrayList` shows on both objects | `CloneDisabledNotFinal` |
-| Class is open | a subclass adds a setter | `FinalIntegerList` |
-| Element type has a setter | `marker.setLabel(...)` | `DeepCopiedMarkers` |
-| Same-module `Field.set` on the instance | replaces the private final field | no class in this file; see the ceiling below |
+## 1. SharesCallerList
 
-## Where the old `main` went
-
-The previous `main` ran three writes against one object:
-
-- `a.add(34)` after `new` changes the object when the constructor stores `a`. That is `SharesCallerList`.
-- `i.getUniqueNumbers().add(58)` changes the object when the getter returns the internal list. That is `CopiesListInConstructor`. The constructor copy is already in place, so `a.add(34)` no longer shows up.
-- `((ImmutableViaClassTest) i.clone()).getUniqueNumbers().add(10000)` needs a getter that returns a live shared list. After the getter returns `Collections.unmodifiableList`, that `add` throws. `UnmodifiableGetterShallowClone` prints that rejection, then shows the leak that is still there: `clone()` aliased the `ArrayList`, and writing that list updates the original and the clone.
-
-## 1. `SharesCallerList`
+**Issue:** The constructor does this:
 
 ```java
 this.uniqueNumbers = uniqueNumbers;
 ```
 
-`final` fixes the field slot. It does not freeze the list object. The caller and the instance hold one list. `input.add(34)` is visible in `toString`.
+`final` only stops you from pointing the field at a different list. It does not freeze the list. The caller and the object hold one list. `input.add(34)` shows up in `toString`.
 
-`getUniqueNumbers()` returns that same list too. The next type leaves this getter leak as the one you can still see, after the constructor copy.
+The getter returns that same list too. The next class leaves that getter problem open on purpose.
 
-`id` is an `int` and `name` is a `String`. Callers can change their own variables. They cannot reach into this object and change those values. No copy is required for them.
+`id` is an `int`. `name` is a `String`. The caller can change their own variables. They cannot change these two values inside the object. You do not need to copy them.
 
-## 2. `CopiesListInConstructor`
+**Fix:** The next class copies the list in the constructor.
+
+## 2. CopiesListInConstructor
+
+**Issue:** Class 1 kept the caller's list.
+
+**Fix:**
 
 ```java
 this.uniqueNumbers = new ArrayList<>(uniqueNumbers);
 ```
 
-`new ArrayList<>(null)` throws `NullPointerException`, so a null argument is stored as null. The copy is shallow: new list, same element references. For `Integer` that is enough, because an `Integer` has no setter.
+`input.add(34)` now stays on the caller's list. The object still prints `[1, 3]`.
 
-`input.add(34)` stays on `input`. The object still prints `[1, 3]`.
+The code stores null when the argument is null. It does that because `new ArrayList<>(null)` throws `NullPointerException`. The copy is a new list, but the items inside are the same objects. That is enough for `Integer`, because `Integer` has no setter.
+
+**Issue still open:** The getter returns the real list:
 
 ```java
 public List<Integer> getUniqueNumbers() {
@@ -61,92 +64,119 @@ public List<Integer> getUniqueNumbers() {
 }
 ```
 
-`getUniqueNumbers().add(58)` writes the internal `ArrayList`. The object prints `[1, 3, 58]`.
+`getUniqueNumbers().add(58)` writes the list inside the object. The object prints `[1, 3, 58]`.
 
-Returning `new ArrayList<>(uniqueNumbers)` from the getter would also keep this object stable: the caller would edit the detached copy. The failure mode is quiet. The caller believes the object changed. Storing an immutable list and returning it makes the `add` throw. Prefer the throw.
+You could return `new ArrayList<>(uniqueNumbers)` from the getter. The object would stay the same, but the caller would think their `add` changed it. That failure is quiet. A list that throws on `add` is clearer. Prefer the throw.
 
-## 3. `UnmodifiableGetterShallowClone`
+## 3. UnmodifiableGetterShallowClone
 
-The constructor still copies into an `ArrayList`. The getter returns `Collections.unmodifiableList(uniqueNumbers)` when the list is non-null.
+**Issue:** Class 2 copies the list, but the getter gives the real `ArrayList` back.
+
+**Fix:** The constructor still copies into an `ArrayList`. The getter returns `Collections.unmodifiableList(uniqueNumbers)` when the list is not null.
 
 `getUniqueNumbers().add(58)` throws `UnsupportedOperationException`. The object stays `[1, 3]`.
 
-`unmodifiableList` does not copy. It delegates to the list you pass in. Two different fixes get confused here:
+`unmodifiableList` does not copy. It is only a window over the list you pass in. Two different fixes get mixed up here:
 
-- Wrap the caller's list and skip the `ArrayList` copy. The caller still holds the backing list, so `input.add` shows through the wrapper.
-- Copy, then wrap, which is what this class does. `input.add` is isolated. The internal `ArrayList` is still writable by anyone who obtains it.
+- If you wrap the caller's list and skip the copy, the caller still holds the real list. `input.add` still shows through the window.
+- This class copies first, then wraps. `input.add` is safe. The `ArrayList` inside the object is still writable by anyone who gets it.
 
-This class implements `Cloneable`. `clone()` calls `super.clone()`. That copies the reference in `uniqueNumbers` and allocates no new list. The getter on the clone is the same wrapper, so `copy.getUniqueNumbers().add(10000)` throws too. The original and the clone still hold one `ArrayList`. The demo takes that list through reflection (the field is private; the alias is real) and adds `10000`. Both objects print `[1, 3, 10000]`.
+**Issue still open:** This class implements `Cloneable`. `clone()` calls `super.clone()`. That copies the field, not the list. The original and the clone hold one `ArrayList`.
 
-`final` on the field does not matter to `clone`. The JVM writes the copied reference into the clone's field.
+`add` on the getter still throws, on both objects. The demo reads the private field and adds `10000`. Both objects print `[1, 3, 10000]`.
 
-## 4. `CloneDisabledNotFinal`
+`final` on the field does not stop `clone`. The JVM writes the copied reference into the clone.
+
+## 4. CloneDisabledNotFinal
+
+**Issue:** Class 3 still shares one `ArrayList` through `clone()`.
+
+**Fix:**
 
 ```java
 this.uniqueNumbers = List.copyOf(uniqueNumbers);
 ```
 
-`List.copyOf` copies into a list that rejects `add`, `set`, and `remove`. A shallow copy of that list would share a list that rejects writes, so for `Integer` the shared reference would stay immutable. `clone()` still throws. Construction stays in the constructor, which is the path that copies. The broken alias is section 3, where the shared object is an `ArrayList`.
+`List.copyOf` makes a list that rejects `add`, `set`, and `remove`. A copy of that list would still reject writes. For `Integer`, sharing that list would stay safe.
 
-`clone()` throws `CloneNotSupportedException` and tells the caller to use the constructor. The class does not implement `Cloneable`. A public `clone()` that called `super.clone()` would throw the same exception for that reason. Throwing before `super.clone()` keeps the message. A null list throws `NullPointerException`. A null element throws `NullPointerException`.
+`clone()` throws `CloneNotSupportedException`. The message says to use the constructor. The class does not implement `Cloneable`. A null list throws `NullPointerException`. A null item throws `NullPointerException`.
 
-The class is not `final`. `MutableChild` extends it and adds `setNickname`. This is legal:
+**Issue still open:** The class is not `final`. `MutableChild` extends it and adds `setNickname`. This is legal:
 
 ```java
 CloneDisabledNotFinal asParent = new MutableChild(1, "Manoj", numbers);
 ((MutableChild) asParent).setNickname("changed");
 ```
 
-The list from the superclass still rejects `add`. The instance is mutable because of `nickname`. A variable whose compile-time type is the "immutable" class can point at that instance.
+The list from the parent still rejects `add`. The object can still change because of `nickname`. A variable of the "immutable" type can point at that child.
 
-## 5. `FinalIntegerList`
+## 5. FinalIntegerList
 
-The class is `final`, so `MutableChild` cannot extend it. Fields are `private final`. The constructor stores `List.copyOf`. Getters return the fields. `clone()` throws.
+**Issue:** Class 4 can be extended. A child can add a setter.
 
-For `int`, `String`, and `List<Integer>` this is the class form to keep. Run of `main` on OpenJDK 25.0.2:
+**Fix:** The class is `final`, so `MutableChild` cannot extend it. The fields are `private final`. The constructor stores `List.copyOf`. The getters return the fields. `clone()` throws.
+
+For `int`, `String`, and `List<Integer>`, this is the class to keep.
+
+On OpenJDK 25.0.2, `main` shows:
 
 - `input.add(34)` leaves the object at `[1, 3]`
-- getter `add` throws `UnsupportedOperationException`
+- `add` on the getter throws `UnsupportedOperationException`
 - `clone()` throws `CloneNotSupportedException`
 - `new FinalIntegerList(1, "Manoj", null)` throws `NullPointerException`
-- a list containing a null element throws `NullPointerException`
+- a list with a null item throws `NullPointerException`
 
-`equals` and `hashCode` are not written here. Add them from the fields when this object is a value that goes into a `HashMap` or a set. `CopiedIntegerList` already has them, because a record generates both.
+This class does not write `equals` and `hashCode`. Add them from the fields if you put the object in a `HashMap` or a `Set`. The record `CopiedIntegerList` already has both, because a record writes them for you.
 
-The record form of this section is `ImmutableViaRecordTest.CopiedIntegerList`, walked in `notes/02_immutable_via_record.md`.
+The record version of this step is in `02_immutable_via_record.md`.
 
-## 6. `SharesMutableElements`
+**Issue still open:** If an item in the list has a setter, copying the list is not enough. The next class shows that.
 
-Same shell as `FinalIntegerList`: final class, `List.copyOf`, `clone()` throws. The element type is `Marker`, which has `setLabel`.
+## 6. SharesMutableElements
 
-`input.add(new Marker("beta"))` stays out of the object. The list structure was copied.
+**Issue:** `List.copyOf` copies the list. It keeps the same item objects.
 
-`marker.setLabel("from-caller")` changes the object. The copy and the caller share the `Marker`.
+**Fix for the list shape:** This class is final, uses `List.copyOf`, and `clone()` throws. `input.add(new Marker("beta"))` stays out of the object. `getMarkers().add(...)` throws.
 
-`getMarkers().get(0).setLabel("from-getter")` changes the object again. `unmodifiable` / `List.copyOf` block structural edits. They do not wrap the elements.
+**Issue still open:** `Marker` has `setLabel`.
 
-`getMarkers().add(...)` throws.
+- `marker.setLabel("from-caller")` changes the object. The copy and the caller share that `Marker`.
+- `getMarkers().get(0).setLabel("from-getter")` changes the object again.
 
-## 7. `DeepCopiedMarkers`
+`List.copyOf` blocks `add` on the list. It does not protect the items.
 
-The constructor reads `Marker.getLabel()` while it builds the object and stores `List.copyOf` of those `String`s. `String` has no setter. After `new` returns, `setLabel` on the caller's `Marker` and `add` on the caller's list leave the stored labels at the construction-time values. `getLabels().add` throws. The class is final. `clone()` throws.
+## 7. DeepCopiedMarkers
 
-That is the rule for a mutable element: copy the data you mean to keep into types that have no setters (`String`, `int`, another record of those), then store the collection with `List.copyOf`.
+**Issue:** Class 6 shares the `Marker` objects. A setter on a `Marker` changes the stored object.
 
-## Ceiling: reflection
+**Fix:** The constructor reads each `getLabel()` while it builds the object. It stores `List.copyOf` of those `String` values. A `String` has no setter.
 
-`List.copyOf` still rejects `add` when the list is read with `field.get` after `setAccessible(true)`. The demo prints `UnsupportedOperationException`, and the object stays `[1, 3]`.
+After `new` returns:
 
-`Field.set` on the private final instance field `uniqueNumbers` is allowed on this JDK for a normal class. The demo replaces it with `List.of(7)`, and `toString` prints `[7]`. `final` stops a normal assignment in source. On OpenJDK 25.0.2 `Field.set` still replaces an instance field of a class in this module.
+- `setLabel` on the caller's `Marker` does not change the stored labels
+- `add` on the caller's list does not change the stored labels
+- `getLabels().add` throws
 
-A record component is the exception on this JDK. `Field.set` on `CopiedIntegerList.uniqueNumbers` throws `IllegalAccessException`, and the record stays `[1, 3]`. That run is in the record chain.
+The class is final. `clone()` throws.
 
-Code that can call `setAccessible` on your class is already running inside the process. For a normal class, immutability is a guarantee to normal callers.
+That is the rule for a changeable item. Copy the data you want to keep into a type with no setter (`String`, `int`, or a record of those). Then store the collection with `List.copyOf`.
 
-## Serializable, if you add it later
+## The limit: reflection
 
-None of these types implement `Serializable`.
+**Issue:** `Field.set` can replace a private final field on a normal class.
 
-The lists from `List.copyOf` / `List.of` deserialize as immutable lists (the JDK writes a serialization proxy and rebuilds with `List.of`). A field that still holds an `ArrayList` deserializes as an `ArrayList`. A getter that returns that field hands out a live list on the deserialized copy, which is the getter leak again.
+`List.copyOf` still rejects `add` when the list is read with `field.get` after `setAccessible(true)`. The demo prints `UnsupportedOperationException`. The object stays `[1, 3]`.
 
-If you mark a class `Serializable` and the field is a collection type you control, copy again inside `readObject` the same way the constructor copies.
+On OpenJDK 25.0.2, `Field.set` on the field `uniqueNumbers` is allowed for this class. The demo replaces it with `List.of(7)`. `toString` prints `[7]`. `final` stops a normal assignment in source code. It does not stop this `Field.set` on a class in this module.
+
+**Fix:** A record component is different on this JDK. `Field.set` on `CopiedIntegerList.uniqueNumbers` throws `IllegalAccessException`. The record stays `[1, 3]`. That run is in the record note.
+
+Code that can call `setAccessible` is already running inside your program. For a normal class, immutability is a promise to normal callers.
+
+## If you add Serializable later
+
+**Issue:** None of these classes implement `Serializable` today. If you add it, the default save-and-load builds a new object and does not use your constructor.
+
+Lists from `List.copyOf` and `List.of` come back as lists that reject `add`. The JDK rebuilds them with `List.of`. A field that still holds an `ArrayList` comes back as an `ArrayList`. A getter that returns that field gives out a live list again.
+
+**Fix:** If the class implements `Serializable`, copy again inside `readObject`, the same way the constructor copies.
