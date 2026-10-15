@@ -1,97 +1,96 @@
 # Java Forge
 
-Core Java interview topics, learned one problem at a time.
+This project is for learning Core Java.
 
-Each topic starts with the old approach and the issue that approach has. The next example fixes that issue in a different way. A later example improves the fix. The code keeps every step so you can see why the next one exists.
+We do not start with the best answer. We start with the old way. We see the problem. Then we fix it in another way. Then we improve that fix.
 
-Read the `notes` folder beside the code. The notes are how you understand the topic: what used to go wrong, which fix closed it, what that fix still left open, and which version to keep.
+## Read the notes
 
-## How a topic is built
+Every topic has a `notes` folder next to the code. Read the notes with the code.
 
-1. Write the old approach and let the issue show up.
-2. Fix that issue with another approach.
-3. Improve the fix until you reach the version worth keeping.
-4. Read the notes in that topic before you treat the last version as the answer.
+Each step in a note says two things:
 
-Each next example closes the previous leak and leaves the next one open.
+- **Issue:** what goes wrong.
+- **Fix:** how the next way solves it.
 
-## Layout
+The code shows the steps. The notes tell you why.
 
-```
-java-core/                                          Maven module, Java 21
-└── src/test/
-    ├── java/xyz/manojraw/exercises/interview/
-    │   ├── immutable/                              class, then record
-    │   │   └── notes/
-    │   ├── java8plusfeatures/                      small record example
-    │   ├── singleton/                              eager, then lazy forms, then enum
-    │   │   └── notes/
-    │   └── threads/                                wait/notify, then ArrayBlockingQueue
-    │       └── notes/
-    └── resources/                                  cars.json, people.json
-```
+## What is in this project
 
-Build from `java-core` with Maven. Source and target are Java 21. The module also has JUnit 5, AssertJ, Guava, Gson, and Commons IO. The lessons are plain Java. Run a topic by running its `main`.
+There is one project folder: `java-core`.
 
-`resources` still has `cars.json` and `people.json`. The interview examples do not read those files.
+The lessons are here:
+
+`java-core/src/test/java/xyz/manojraw/exercises/interview/`
+
+| Folder | What you learn |
+| --- | --- |
+| `immutable` | An object that should not change after it is created |
+| `singleton` | Only one shared object |
+| `threads` | One side adds work. The other side does the work |
+| `java8plusfeatures` | A very small record example |
+
+`java-core/src/test/resources/` has `cars.json` and `people.json`. The lessons do not use those files.
+
+The Java version is 21. You can run each lesson from its `main` method.
 
 ## immutable
 
-Make an object that callers cannot change after the constructor.
+**Issue:** A class can look frozen. A later `add` on a list can still change the object. The caller may still hold that list. The getter may give the real list back. `clone` may share the list. A child class may add a setter. An item inside the list may have a setter.
 
-The first type stores the caller's list, so a later `add` changes the object. The next type copies the list in the constructor, and the getter still returns a live list. Later steps wrap that list, stop `clone` from sharing it, close the class to subclasses, then copy mutable elements into values that have no setter. The record file walks the same leaks. A record is already final, and it still stores a list reference until you copy the list.
+**Fix:** Each next class closes one of those holes. The record file walks the same holes. A record is already a final class. It still stores your list until you copy the list.
 
-| Step | Class | Record |
-| --- | --- | --- |
-| Caller's list is stored | `SharesCallerList` | `SharesCallerList` |
-| Copy in the constructor | `CopiesListInConstructor` | `CopiesListInConstructor` |
-| Getter or accessor no longer returns a live list | `UnmodifiableGetterShallowClone` | `UnmodifiableAccessorShallowClone` |
-| `clone` no longer shares the list | `CloneDisabledNotFinal` | `CopiedIntegerList` |
-| Class cannot be subclassed, list is copied | `FinalIntegerList` | already final; `CopiedIntegerList` |
-| Mutable elements are copied as values | `DeepCopiedMarkers` | `DeepCopiedMarkers` |
+| Step | What is wrong | Class that shows the next fix | Record |
+| --- | --- | --- | --- |
+| 1 | The constructor keeps the caller's list | `SharesCallerList` | `SharesCallerList` |
+| 2 | Copy the list in the constructor. The getter still returns the real list | `CopiesListInConstructor` | `CopiesListInConstructor` |
+| 3 | The getter hides the list. `clone` still shares it | `UnmodifiableGetterShallowClone` | `UnmodifiableAccessorShallowClone` |
+| 4 | `clone` is blocked. The class can still be extended | `CloneDisabledNotFinal` | `CopiedIntegerList` |
+| 5 | The class is final and the list rejects `add` | `FinalIntegerList` | A record is already final |
+| 6 | Items inside the list can still change. Copy their values | `DeepCopiedMarkers` | `DeepCopiedMarkers` |
 
-Notes, in this order:
+Read the notes in this order:
 
-- [`immutable/notes/01_immutable_via_class.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/01_immutable_via_class.md) — each class, the leak it closes, and the leak it leaves.
-- [`immutable/notes/02_immutable_via_record.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/02_immutable_via_record.md) — the same walk on a record, and why a record does not freeze a `List` by itself.
+1. [Class note](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/01_immutable_via_class.md)
+2. [Record note](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/02_immutable_via_record.md)
 
-Run `xyz.manojraw.exercises.interview.immutable.Main`. It runs every class demo, then every record demo.
+Run `Main` in the `immutable` folder. It runs the class examples, then the record examples.
 
-Keep `CopiedIntegerList` when the fields are already immutable (`int`, `String`, `Integer`). Keep `DeepCopiedMarkers` when an element still has a setter. Use `FinalIntegerList` when the type has to be a normal class.
+Keep `CopiedIntegerList` when the values are `int`, `String`, or `Integer`. Keep `DeepCopiedMarkers` when an item still has a setter. Use `FinalIntegerList` when you need a normal class.
 
 ## singleton
 
-One shared instance, then the ways a second instance still appears.
+**Issue:** You want one shared object. Two threads, reflection, save-and-load, or `clone` can still create a second one.
 
-The folder moves from the older forms to the one to keep:
+**Fix:** The folder tries the old ways first, then the better ways.
 
-1. `SingletonExampleEager` — created when the class loads.
-2. `SingletonExampleLazyViaSynchronizedMethod` — created on first use. Every call takes the lock.
-3. `SingletonExampleLazyViaDoubleLocking` — the lock is taken only while the instance is missing.
-4. `SingletonExampleLazyViaHolder` — lazy class. Later reads take no lock.
-5. `SingletonExampleLazyViaEnum` — the form to keep. The JVM blocks a second object from reflection, `clone`, and serialization.
+1. `SingletonExampleEager` — create it when the class loads.
+2. `SingletonExampleLazyViaSynchronizedMethod` — create it on the first call. Every call takes a lock.
+3. `SingletonExampleLazyViaDoubleLocking` — take the lock only while the object is missing.
+4. `SingletonExampleLazyViaHolder` — create it on the first call. Later calls take no lock.
+5. `SingletonExampleLazyViaEnum` — the one to keep. The JVM blocks a second object from reflection, `clone`, and save-and-load.
 
-Notes:
+Read [the singleton note](java-core/src/test/java/xyz/manojraw/exercises/interview/singleton/notes/01_how_to_create_a_singleton.md).
 
-- [`singleton/notes/01_how_to_create_a_singleton.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/singleton/notes/01_how_to_create_a_singleton.md) — what each form fixes, which form to prefer, and the attacks that still make a second object for a normal class.
-
-`SingletonThreadTest` starts several threads on each form and counts how many distinct objects they saw. The note explains what that run shows and what it leaves out (reflection, save-and-load, `clone`, a second class loader).
+`SingletonThreadTest` starts 8 threads on each form. It counts how many different objects they saw. The note says what that test does not catch.
 
 ## threads
 
-A producer puts work on a shared queue. A consumer takes that work off. They do not call each other.
+**Issue:** A coffee shop has two sides. One side adds orders. The other side makes them. If you write the waiting yourself, the consumer can stop, miss a wake-up, or hold the lock too long.
 
-`ConsumerProducerTest` is the old approach: your own queue, `synchronized`, `wait`, and `notify`. The first note is the issues that showed up in that code and the fix for each one. The consumer could stop after a single drain. `wait` outside a loop could miss a signal. Work done while holding the lock blocked the other side.
+**Fix:** `ConsumerProducerTest` is the hand-written queue. It uses `synchronized`, `wait`, and `notify`. The first note lists each bug and the fix.
 
-`ConsumerProducerViaArrayBlockingQueueTest` is the improved version. `ArrayBlockingQueue` blocks `put` when the queue is full and `take` when it is empty, so that hand-written waiting goes away.
+**Better fix:** `ConsumerProducerViaArrayBlockingQueueTest` uses `ArrayBlockingQueue`. `put` waits when the queue is full. `take` waits when the queue is empty. You do not write `wait` and `notify` yourself.
 
-Notes, in this order:
+Read the notes in this order:
 
-1. [`threads/notes/01_consumer_producer.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/threads/notes/01_consumer_producer.md) — the hand-written queue, the bugs, and how each bug was fixed.
-2. [`threads/notes/02_array_blocking_queue.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/threads/notes/02_array_blocking_queue.md) — why the library queue is the one to keep, and what it still does not do for you.
+1. [Hand-written queue](java-core/src/test/java/xyz/manojraw/exercises/interview/threads/notes/01_consumer_producer.md)
+2. [ArrayBlockingQueue](java-core/src/test/java/xyz/manojraw/exercises/interview/threads/notes/02_array_blocking_queue.md)
 
 Both `main` methods keep running. Stop them by hand.
 
 ## java8plusfeatures
 
-`RecordTest` is a short record that implements `Cloneable` and clones itself. The full record lesson, including what `clone` still shares, is the immutable folder and [`02_immutable_via_record.md`](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/02_immutable_via_record.md).
+`RecordTest` is a short record. It copies itself with `clone`.
+
+The full record lesson is in the immutable folder. Read [the record note](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/02_immutable_via_record.md).
