@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Category')}"></head>
+<body>
+<div th:replace="~{fragments :: header}"></div>
+
+<main class="container">
+    <div class="page-head">
+        <div>
+            <a class="crumb" th:href="@{/}">← Home</a>
+            <h1 id="title">Category</h1>
+        </div>
+        <div id="count" class="muted"></div>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div id="pager" class="pager"></div>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/category.js}"></script>
+</body>
+</html>

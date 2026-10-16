@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Product')}"></head>
+<body>
+<div th:replace="~{fragments :: header}"></div>
+
+<main class="container">
+    <a class="crumb" href="javascript:history.back()">← Back</a>
+    <div id="product" class="product"></div>
+
+    <section class="reviews">
+        <h2>Ratings &amp; reviews</h2>
+        <div id="summary" class="summary"></div>
+        <div id="reviews"></div>
+        <div id="pager" class="pager"></div>
+    </section>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/product.js}"></script>
+</body>
+</html>

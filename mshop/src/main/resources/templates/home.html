@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Home')}"></head>
+<body>
+<div th:replace="~{fragments :: header}"></div>
+
+<main class="container">
+    <section class="hero">
+        <h1>Find something you'll love</h1>
+        <p>Browse by category, open a product, read what others think.</p>
+    </section>
+    <div id="sections"></div>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/home.js}"></script>
+</body>
+</html>
