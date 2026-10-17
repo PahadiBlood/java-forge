@@ -11,8 +11,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -80,13 +79,33 @@ public class ProductServiceImpl {
 
     public ProductWrapper findAllProducts(String category, int page, int size) {
         if (page < 0) page = 0;
-        var productsByCategory = products
-                .stream()
-                .filter(p -> (category == null || category.isBlank() || p.getCategory().equalsIgnoreCase(category)))
-                .toList();
+//        var productsByCategory = products
+//                .stream()
+//                .filter(p -> (category == null || category.isBlank() || p.getCategory().equalsIgnoreCase(category)))
+//                .toList();
+
+        final Set<String> productIds = new HashSet<>();
+        List<Product> productsByCategory;
+        if (category == null || category.isBlank()) {
+            productsByCategory = products;
+        } else {
+            productsByCategory = new ArrayList<>();
+            products.forEach(p -> {
+                if (p.getCategory().equalsIgnoreCase(category)) {
+                    productsByCategory.add(p);
+                    productIds.add(p.getId());
+                }
+            });
+        }
 
         long totalItems = productsByCategory.size();
         int totalPages = (int) Math.ceil((double) totalItems / size);
+
+        // TODO:  Read reviews average and total based on category products
+        var res = reviews
+                .stream()
+                .filter(r -> productIds.contains(r.getProductId()))
+                .collect(Collectors.summarizingDouble(Review::getRating));
 
         var productByCategoryPageSize = productsByCategory
                 .stream()
@@ -102,10 +121,10 @@ public class ProductServiceImpl {
                 ))
                 .toList();
 
-
-        // TODO:  Read reviews average and total based on category products
-
-        return new ProductWrapper(productByCategoryPageSize, page, size, totalPages, totalItems, new ProductReviewSummary(1, 5));
+        return new ProductWrapper(
+                productByCategoryPageSize, page, size, totalPages, totalItems,
+                new ProductReviewSummary(res.getAverage(), res.getCount())
+        );
     }
 
     public ProductResponse findProductById(String id) {
