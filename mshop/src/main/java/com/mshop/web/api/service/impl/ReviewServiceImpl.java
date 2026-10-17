@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -36,7 +37,12 @@ public class ReviewServiceImpl {
 
         var reviewsByProductId = reviews
                 .stream()
-                .filter(r -> r.getProductId().equalsIgnoreCase(id)).toList();
+                .filter(r -> r.getProductId().equalsIgnoreCase(id))
+                .toList();
+
+        var summary = reviewsByProductId
+                .stream()
+                .collect(Collectors.summarizingDouble(Review::getRating));
 
         var filteredReviewsByProductId = reviewsByProductId
                 .stream()
@@ -56,6 +62,9 @@ public class ReviewServiceImpl {
         int totalPages = (int) Math.ceil((double) totalItems / size);
 
 
-        return new ReviewWrapper(filteredReviewsByProductId, page, size, totalPages, totalItems, new ProductReviewSummary(4.5, 10));
+        return new ReviewWrapper(
+                filteredReviewsByProductId, page, size, totalPages, totalItems,
+                new ProductReviewSummary(summary.getAverage(), summary.getCount())
+        );
     }
 }
