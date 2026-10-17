@@ -4,7 +4,6 @@ import com.mshop.web.api.dto.HomeSection;
 import com.mshop.web.api.dto.ProductResponse;
 import com.mshop.web.api.dto.ProductWrapper;
 import com.mshop.web.api.service.impl.ProductServiceImpl;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,13 +37,13 @@ public class ProductApiController {
     @GetMapping("/products")
     public ResponseEntity<ProductWrapper> findAllProducts(@RequestParam(required = false) String category,
                                                           @RequestParam(defaultValue = "0") int page,
-                                                          @RequestParam(defaultValue = "12") int size) {
-        return null;
+                                                          @RequestParam(defaultValue = "15") int size) {
+        return ResponseEntity.ok(productServiceImpl.findAllProducts(category, page, size));
     }
 
     // find product by id
     @GetMapping("/products/{id}")
     public ResponseEntity<ProductResponse> findProductById(@PathVariable String id) {
-        return null;
+        return ResponseEntity.ok(productServiceImpl.findProductById(id));
     }
 }
