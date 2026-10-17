@@ -25,6 +25,22 @@ a { color: inherit; text-decoration: none; }
 .nav a { padding: 6px 12px; border-radius: 999px; color: var(--muted); white-space: nowrap; font-weight: 500; }
 .nav a:hover { background: var(--brand-soft); color: var(--brand); }
 
+.header-search { position: relative; display: flex; flex: 1; max-width: 420px; min-width: 180px; }
+.header-search input, .sort-control select { color: var(--text); background: var(--surface); border: 1px solid var(--border); font: inherit; }
+.header-search input { width: 100%; height: 40px; padding: 0 44px 0 14px; border-radius: 999px; outline: none; }
+.header-search input:focus, .sort-control select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+.header-search button { position: absolute; top: 2px; right: 4px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--brand); color: #fff; font-size: 22px; cursor: pointer; }
+.search-suggestions { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; right: 0; padding: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.search-suggestions[hidden] { display: none; }
+.suggestion { display: flex; align-items: center; gap: 11px; padding: 8px; border-radius: 10px; }
+.suggestion:hover, .suggestion:focus { background: var(--brand-soft); outline: none; }
+.suggestion img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: var(--brand-soft); }
+.suggestion-copy { min-width: 0; display: grid; }
+.suggestion-copy strong, .suggestion-copy span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.suggestion-copy span { color: var(--muted); font-size: 13px; }
+.suggestion-empty { padding: 12px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 .hero { padding: 36px 0 12px; }
 .hero h1 { margin: 0 0 6px; font-size: 32px; letter-spacing: -.8px; }
 .hero p { margin: 0; color: var(--muted); }
@@ -55,6 +71,9 @@ a { color: inherit; text-decoration: none; }
 .page-head h1 { margin: 4px 0 0; font-size: 30px; letter-spacing: -.6px; }
 .crumb { color: var(--muted); font-weight: 500; display: inline-block; margin-top: 22px; }
 .page-head .crumb { margin-top: 0; }
+.category-tools, .reviews-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sort-control { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.sort-control select { min-height: 40px; padding: 0 34px 0 12px; border-radius: 10px; cursor: pointer; }
 .crumb:hover { color: var(--brand); }
 
 .pager { display: flex; justify-content: center; gap: 6px; margin: 28px 0 40px; flex-wrap: wrap; }
@@ -74,6 +93,12 @@ a { color: inherit; text-decoration: none; }
 .stars { color: var(--star); letter-spacing: 2px; white-space: nowrap; }
 
 .reviews h2 { font-size: 22px; letter-spacing: -.3px; margin: 8px 0 14px; }
+.reviews-heading { margin-bottom: 14px; }
+.reviews-heading h2 { margin: 8px 0; }
+.search-page-head { padding: 34px 0 20px; }
+.search-page-head h1 { margin: 0; font-size: 30px; letter-spacing: -.6px; }
+.search-page-head p { margin: 5px 0 0; color: var(--muted); }
+.search-empty { grid-column: 1 / -1; padding: 36px 20px; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted); background: var(--surface); }
 .summary { display: flex; align-items: center; gap: 16px; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 14px; }
 .summary:empty { display: none; }
@@ -97,6 +122,10 @@ a { color: inherit; text-decoration: none; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 760px) {
+  .bar { gap: 12px; flex-wrap: wrap; height: auto; min-height: 60px; padding-top: 10px; padding-bottom: 10px; }
+  .header-search { order: 3; flex-basis: 100%; max-width: none; }
+  .nav { flex: 1; }
+  .category-tools, .reviews-heading { align-items: flex-start; flex-direction: column; }
   .product { grid-template-columns: 1fr; padding: 18px; gap: 20px; }
   .hero h1 { font-size: 26px; }
 }

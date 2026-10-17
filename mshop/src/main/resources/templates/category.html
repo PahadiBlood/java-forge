@@ -10,7 +10,17 @@
             <a class="crumb" th:href="@{/}">← Home</a>
             <h1 id="title">Category</h1>
         </div>
-        <div id="count" class="muted"></div>
+        <div class="category-tools">
+            <div id="count" class="muted"></div>
+            <label class="sort-control">Sort by
+                <select id="sort-products" aria-label="Sort products">
+                    <option value="featured">Featured</option>
+                    <option value="name-asc">Name: A to Z</option>
+                    <option value="price-asc">Price: low to high</option>
+                    <option value="price-desc">Price: high to low</option>
+                </select>
+            </label>
+        </div>
     </div>
     <div id="summary" class="summary"></div>
     <div id="grid" class="grid"></div>

@@ -9,7 +9,17 @@
     <div id="product" class="product"></div>
 
     <section class="reviews">
-        <h2>Ratings &amp; reviews</h2>
+        <div class="reviews-heading">
+            <h2>Ratings &amp; reviews</h2>
+            <label class="sort-control">Sort reviews
+                <select id="sort-reviews" aria-label="Sort reviews">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="rating-desc">Highest rating</option>
+                    <option value="rating-asc">Lowest rating</option>
+                </select>
+            </label>
+        </div>
         <div id="summary" class="summary"></div>
         <div id="reviews"></div>
         <div id="pager" class="pager"></div>

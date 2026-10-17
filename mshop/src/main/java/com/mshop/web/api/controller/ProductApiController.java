@@ -41,6 +41,14 @@ public class ProductApiController {
         return ResponseEntity.ok(productServiceImpl.findAllProducts(category, page, size));
     }
 
+    @GetMapping("/products/search")
+    public ResponseEntity<ProductWrapper> searchProducts(@RequestParam String q,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "15") int size,
+                                                          @RequestParam(defaultValue = "relevance") String sort) {
+        return ResponseEntity.noContent().build();
+    }
+
     // find product by id
     @GetMapping("/products/{id}")
     public ResponseEntity<ProductResponse> findProductById(@PathVariable String id) {

@@ -19,6 +19,11 @@ public class PageController {
         return "category";
     }
 
+    @GetMapping("/search")
+    public String search() {
+        return "search";
+    }
+
     // product details page
     @GetMapping("/product/{id}")
     public String product(@PathVariable String id) {
