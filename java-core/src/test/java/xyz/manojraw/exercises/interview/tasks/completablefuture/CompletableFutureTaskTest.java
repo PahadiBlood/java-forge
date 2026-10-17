@@ -14,6 +14,7 @@ import xyz.manojraw.exercises.interview.modal.Car;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -151,7 +152,7 @@ class CompletableFutureTaskTest {
 
     @Test
     void getCarAndPeople() throws Exception {
-        CarsAndPeople result = carService.getCarAndPeople();
+        CarsAndPeople result = carService.getCarAndPeople(Executors.newFixedThreadPool(5));
 
         assertEquals(DataService.INSTANCE.readCars(), result.cars());
         assertEquals(DataService.INSTANCE.readPeople(), result.people());
