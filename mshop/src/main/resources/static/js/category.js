@@ -15,6 +15,11 @@
       const data = await getJSON(url);
       grid.innerHTML = data.items.map(productCard).join('');
       $('#count').textContent = `${data.totalItems} products`;
+      const s = data.summary || {};
+      $('#summary').innerHTML = s.count
+        ? `<div class="big">${Number(s.average).toFixed(1)}</div>
+           <div><div class="stars">${stars(s.average)}</div><div class="muted">${s.count} reviews</div></div>`
+        : '<div class="muted">No reviews yet.</div>';
       renderPager(pager, data.page, data.totalPages, (p) => load(p, true));
       if (push) {
         history.pushState({ page }, '', `?page=${page + 1}`);
@@ -22,6 +27,7 @@
       }
     } catch (e) {
       pager.innerHTML = '';
+      $('#summary').innerHTML = '';
       showError(grid, 'Could not load products. Implement GET /api/products. (' + e.message + ')');
     }
   }
