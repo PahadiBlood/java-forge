@@ -17,9 +17,14 @@ The code shows the steps. The notes tell you why.
 
 ## What is in this project
 
-There is one project folder: `java-core`.
+There are two project folders.
 
-The lessons are here:
+| Folder | What it is |
+| --- | --- |
+| `java-core` | Small lessons. Each one starts with a problem, then a fix. |
+| `mshop` | A shop in the browser. You read JSON files and practice streams and threads. |
+
+The `java-core` lessons are here:
 
 `java-core/src/test/java/xyz/manojraw/exercises/interview/`
 
@@ -94,3 +99,40 @@ Both `main` methods keep running. Stop them by hand.
 `RecordTest` is a short record. It copies itself with `clone`.
 
 The full record lesson is in the immutable folder. Read [the record note](java-core/src/test/java/xyz/manojraw/exercises/interview/immutable/notes/02_immutable_via_record.md).
+
+## mshop
+
+mShop is a learning project. It looks like a small shop. There is no database. The products and the reviews are offline JSON files:
+
+- `mshop/src/main/resources/data/products.json`
+- `mshop/src/main/resources/data/reviews.json`
+
+Java reads those files when the app starts. `DataCenter` reads the two files at the same time. It uses a pool of two threads and `CompletableFuture`. The services then use streams to filter, group, and page the lists. That is the lesson: streams and threads on real lists you can open in a browser.
+
+The shop has a home page, a page for one category, and a page for one product.
+
+### Run
+
+From the `mshop` folder:
+
+```
+mvn spring-boot:run
+```
+
+You can also run `MshopApplication` from the IDE.
+
+Open http://localhost:8888
+
+The port is 8888. `application.yml` sets `server.port` to 8888.
+
+### How a page loads
+
+Thymeleaf is the HTML tool. A Thymeleaf file is a normal HTML page plus a few tags. Those tags pull in the shared header and the shared footer. Thymeleaf sends that shell to the browser. The script builds the product cards.
+
+1. You open `/`, `/category/Electronics`, or `/product/p-1001`.
+2. `PageController` returns a Thymeleaf template. The template has a nav, an empty content area, and a script tag.
+3. The script calls `/api/...`.
+4. The service uses the lists already read from the JSON files. A stream picks the rows for that call.
+5. Java sends JSON back. The script draws the cards, the stars, and the page buttons.
+
+More detail is in [the mshop README](mshop/README.md). The home-row note is [01_home_sections.md](mshop/src/main/java/com/mshop/web/api/service/impl/notes/01_home_sections.md).
