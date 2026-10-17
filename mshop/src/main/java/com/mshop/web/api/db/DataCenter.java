@@ -37,7 +37,7 @@ public class DataCenter {
     }
 
     public List<Review> readReviews() {
-        try (InputStream in = new ClassPathResource("data/review.json").getInputStream()) {
+        try (InputStream in = new ClassPathResource("data/reviews.json").getInputStream()) {
             List<Review> products = objectMapper.readValue(in, new TypeReference<>() {
             });
             return Collections.unmodifiableList(products);
@@ -46,6 +46,6 @@ public class DataCenter {
         }
     }
 
-    public CompletableFuture<List<Product>> readProductAsync = CompletableFuture.supplyAsync(this::readProducts, service);
+    public CompletableFuture<List<Product>> readProductsAsync = CompletableFuture.supplyAsync(this::readProducts, service);
     public CompletableFuture<List<Review>> readReviewsAsync = CompletableFuture.supplyAsync(this::readReviews, service);
 }

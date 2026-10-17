@@ -1,6 +1,6 @@
 package com.mshop.web.api.dto;
 
-import java.time.Instant;
+import java.util.Date;
 
 public record ReviewResponse(
         String id,
@@ -8,6 +8,6 @@ public record ReviewResponse(
         String author,
         double rating,
         String comment,
-        Instant createdAt
+        Date createdAt
 ) {
 }

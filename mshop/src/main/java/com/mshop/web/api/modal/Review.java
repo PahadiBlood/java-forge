@@ -2,7 +2,7 @@ package com.mshop.web.api.modal;
 
 import lombok.Data;
 
-import java.time.Instant;
+import java.util.Date;
 
 @Data
 public class Review {
@@ -11,5 +11,5 @@ public class Review {
     private String author;
     private double rating;
     private String comment;
-    private Instant createdAt;
+    private Date createdAt;
 }
