@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
       suggestions.innerHTML = '<div class="suggestion-empty">Searching…</div>';
       suggestions.hidden = false;
       try {
-        const params = new URLSearchParams({ q: query, page: '0', size: '6', sort: 'relevance' });
+        const params = new URLSearchParams({ search: query, page: '0', size: '6', sort: 'relevance' });
         const response = await fetch(`/api/products/search?${params}`, {
           headers: { Accept: 'application/json' },
           signal: controller.signal,

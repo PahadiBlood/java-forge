@@ -22,7 +22,7 @@
 
     grid.innerHTML = '<div class="skeleton" style="grid-column:1/-1"></div>';
     try {
-      const searchParams = new URLSearchParams({ q: query, page: String(nextPage), size: String(SIZE), sort: sort.value });
+      const searchParams = new URLSearchParams({ search: query, page: String(nextPage), size: String(SIZE), sort: sort.value });
       const response = await fetch(`/api/products/search?${searchParams}`, {
         headers: { Accept: 'application/json' },
       });
@@ -42,7 +42,7 @@
     } catch (error) {
       pager.innerHTML = '';
       $('#search-count').textContent = '';
-      showError(grid, 'Search results are not available yet. The search endpoint is ready for the backend implementation.');
+      showError(grid, 'Could not load search results. Please try again.');
     }
   }
 
