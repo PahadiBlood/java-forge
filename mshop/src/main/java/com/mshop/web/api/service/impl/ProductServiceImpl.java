@@ -1,10 +1,7 @@
 package com.mshop.web.api.service.impl;
 
 import com.mshop.web.api.db.DataCenter;
-import com.mshop.web.api.dto.HomeSection;
-import com.mshop.web.api.dto.ProductResponse;
-import com.mshop.web.api.dto.ProductReviewSummary;
-import com.mshop.web.api.dto.ProductWrapper;
+import com.mshop.web.api.dto.*;
 import com.mshop.web.api.modal.Product;
 import com.mshop.web.api.modal.Review;
 import jakarta.annotation.PostConstruct;
@@ -79,6 +76,7 @@ public class ProductServiceImpl {
 
     public ProductWrapper findAllProducts(String category, int page, int size) {
         if (page < 0) page = 0;
+        if (size < 1) size = 15;
 //        var productsByCategory = products
 //                .stream()
 //                .filter(p -> (category == null || category.isBlank() || p.getCategory().equalsIgnoreCase(category)))
@@ -141,5 +139,72 @@ public class ProductServiceImpl {
                         p.getImageUrl()
                 ))
                 .orElseThrow(() -> new NoSuchElementException(String.format("Product with id %s not found", id)));
+    }
+
+    public ProductSearchWrapper searchProducts(int page, int size, String sort, String search) {
+        if (page < 0) page = 0;
+        if (size < 1) size = 15;
+
+        search = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+
+        var searchProducts = getSearchProducts(sort, search);
+        var productsResponse = searchProducts
+                .stream()
+                .skip((long) page * size)
+                .limit(size)
+                .map(p ->
+                        new ProductResponse(
+                                p.getId(),
+                                p.getName(),
+                                p.getCategory(),
+                                p.getDescription(),
+                                p.getPrice(),
+                                p.getImageUrl()
+                        )
+                )
+                .toList();
+
+        long totalItems = searchProducts.size();
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+        return new ProductSearchWrapper(productsResponse, page, size, totalPages, totalItems);
+    }
+
+    private static List<Product> getSearchProducts(String sort, String search) {
+        var searchChain = products
+                .stream()
+                .filter(product -> !search.isBlank() && (
+                        product.getName().toLowerCase(Locale.ROOT).contains(search)
+                                || product.getCategory().toLowerCase(Locale.ROOT).contains(search)
+                                || product.getDescription().toLowerCase(Locale.ROOT).contains(search)
+                ));
+
+        if (sort != null && !sort.isBlank() && !"relevance".equalsIgnoreCase(sort)) {
+            Comparator<Product> sortFunction = switch (sort.toLowerCase(Locale.ROOT)) {
+                case "name-asc" -> (o1, o2) -> o1.getName().compareToIgnoreCase(o2.getName());
+                case "price-asc" -> Comparator.comparingDouble(Product::getPrice);
+                case "price-desc" -> Comparator.comparingDouble(Product::getPrice).reversed();
+                default -> null;
+            };
+
+            if (sortFunction != null) {
+                searchChain = searchChain.sorted(sortFunction);
+            }
+        } else {
+            searchChain = searchChain
+                    .sorted(Comparator.comparingInt((Product product) -> relevance(product, search))
+                            .thenComparing(Product::getName, String.CASE_INSENSITIVE_ORDER));
+        }
+
+        return searchChain.toList();
+    }
+
+    private static int relevance(Product product, String search) {
+        String name = product.getName().toLowerCase(Locale.ROOT);
+        String category = product.getCategory().toLowerCase(Locale.ROOT);
+        if (name.equals(search)) return 0;
+        if (name.startsWith(search)) return 1;
+        if (name.contains(search)) return 2;
+        if (category.contains(search)) return 3;
+        return 4;
     }
 }

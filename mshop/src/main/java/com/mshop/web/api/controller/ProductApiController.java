@@ -2,6 +2,7 @@ package com.mshop.web.api.controller;
 
 import com.mshop.web.api.dto.HomeSection;
 import com.mshop.web.api.dto.ProductResponse;
+import com.mshop.web.api.dto.ProductSearchWrapper;
 import com.mshop.web.api.dto.ProductWrapper;
 import com.mshop.web.api.service.impl.ProductServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -42,11 +43,11 @@ public class ProductApiController {
     }
 
     @GetMapping("/products/search")
-    public ResponseEntity<ProductWrapper> searchProducts(@RequestParam String q,
-                                                          @RequestParam(defaultValue = "0") int page,
-                                                          @RequestParam(defaultValue = "15") int size,
-                                                          @RequestParam(defaultValue = "relevance") String sort) {
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<ProductSearchWrapper> searchProducts(@RequestParam(defaultValue = "") String search,
+                                                               @RequestParam(defaultValue = "0") int page,
+                                                               @RequestParam(defaultValue = "15") int size,
+                                                               @RequestParam(defaultValue = "relevance") String sort) {
+        return ResponseEntity.ok(productServiceImpl.searchProducts(page, size, sort, search));
     }
 
     // find product by id
