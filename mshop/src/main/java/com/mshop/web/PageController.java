@@ -13,6 +13,11 @@ public class PageController {
         return "home";
     }
 
+    @GetMapping("/dashboard")
+    public String dashboard() {
+        return "dashboard";
+    }
+
     // full category page
     @GetMapping("/category/{name}")
     public String category(@PathVariable String name) {

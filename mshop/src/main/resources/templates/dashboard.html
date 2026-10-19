@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dashboard')}"></head>
+<body>
+<div th:replace="~{fragments :: header}"></div>
+
+<main class="container dashboard-page">
+    <section class="store-dashboard" aria-labelledby="dashboard-title">
+        <div class="dashboard-heading">
+            <div>
+                <span class="section-kicker">ADMIN OVERVIEW</span>
+                <h1 id="dashboard-title">Dashboard</h1>
+                <p>Monitor sales, fulfillment, and customer activity.</p>
+            </div>
+            <label class="dashboard-range">Order range
+                <select id="dashboard-range" aria-label="Dashboard order range">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+            </label>
+        </div>
+        <p class="dashboard-demo-note">Sample users and orders are in <code>data/users.json</code> and <code>data/orders.json</code>. Dashboard filters are sent to the API.</p>
+        <div id="dashboard-metrics" class="dashboard-metrics" aria-live="polite">
+            <div class="dashboard-skeleton"></div><div class="dashboard-skeleton"></div>
+            <div class="dashboard-skeleton"></div><div class="dashboard-skeleton"></div>
+        </div>
+        <div class="dashboard-panels">
+            <section class="dashboard-panel" aria-labelledby="status-title">
+                <div class="dashboard-panel-heading"><div><span class="section-kicker">FULFILLMENT</span><h2 id="status-title">Order status</h2></div></div>
+                <div id="dashboard-status" class="dashboard-bars"></div>
+            </section>
+            <section class="dashboard-panel" aria-labelledby="revenue-title">
+                <div class="dashboard-panel-heading"><div><span class="section-kicker">TOP CATEGORIES</span><h2 id="revenue-title">Revenue by category</h2></div></div>
+                <div id="dashboard-revenue" class="dashboard-bars"></div>
+            </section>
+            <section class="dashboard-panel" aria-labelledby="customers-title">
+                <div class="dashboard-panel-heading"><div><span class="section-kicker">CUSTOMER INSIGHTS</span><h2 id="customers-title">Top customers</h2></div></div>
+                <div id="dashboard-customers" class="dashboard-bars"></div>
+            </section>
+        </div>
+        <section class="dashboard-panel dashboard-orders" aria-labelledby="orders-title">
+            <div class="dashboard-panel-heading"><div><span class="section-kicker">ORDER MANAGEMENT</span><h2 id="orders-title">Orders</h2></div><span id="dashboard-order-count" class="dashboard-count"></span></div>
+            <div class="order-tools">
+                <label class="order-search">Search orders
+                    <input id="order-search" type="search" placeholder="Order ID or customer" autocomplete="off">
+                </label>
+                <label>Status
+                    <select id="order-status">
+                        <option value="">All statuses</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                        <option value="CANCELLED">Cancelled</option>
+                        <option value="RETURNED">Returned</option>
+                    </select>
+                </label>
+                <label>Sort by
+                    <select id="order-sort">
+                        <option value="createdAt,desc">Newest first</option>
+                        <option value="createdAt,asc">Oldest first</option>
+                        <option value="total,desc">Highest total</option>
+                        <option value="total,asc">Lowest total</option>
+                    </select>
+                </label>
+            </div>
+            <div class="dashboard-table-wrap">
+                <table class="dashboard-table">
+                    <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Status</th><th>Date</th><th>Total</th></tr></thead>
+                    <tbody id="dashboard-orders"></tbody>
+                </table>
+            </div>
+            <div class="orders-footer"><span id="order-results" class="dashboard-count"></span><div id="order-pagination" class="order-pagination"></div></div>
+        </section>
+    </section>
+</main>
+
+<div th:replace="~{fragments :: footer}"></div>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/dashboard.js}"></script>
+</body>
+</html>
