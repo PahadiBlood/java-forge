@@ -1,0 +1,56 @@
+[
+  {
+    "id": "u-2001",
+    "firstName": "Aarav",
+    "lastName": "Mehta",
+    "email": "aarav.mehta@example.test",
+    "phone": "+91-90000-10001",
+    "city": "Mumbai",
+    "createdAt": "2026-01-12T09:30:00Z"
+  },
+  {
+    "id": "u-2002",
+    "firstName": "Mira",
+    "lastName": "Shah",
+    "email": "mira.shah@example.test",
+    "phone": "+91-90000-10002",
+    "city": "Ahmedabad",
+    "createdAt": "2026-02-04T11:15:00Z"
+  },
+  {
+    "id": "u-2003",
+    "firstName": "Kabir",
+    "lastName": "Rao",
+    "email": "kabir.rao@example.test",
+    "phone": "+91-90000-10003",
+    "city": "Bengaluru",
+    "createdAt": "2026-02-18T15:45:00Z"
+  },
+  {
+    "id": "u-2004",
+    "firstName": "Anaya",
+    "lastName": "Iyer",
+    "email": "anaya.iyer@example.test",
+    "phone": "+91-90000-10004",
+    "city": "Chennai",
+    "createdAt": "2026-03-02T08:10:00Z"
+  },
+  {
+    "id": "u-2005",
+    "firstName": "Dev",
+    "lastName": "Patel",
+    "email": "dev.patel@example.test",
+    "phone": "+91-90000-10005",
+    "city": "Pune",
+    "createdAt": "2026-03-17T12:20:00Z"
+  },
+  {
+    "id": "u-2006",
+    "firstName": "Tara",
+    "lastName": "Nair",
+    "email": "tara.nair@example.test",
+    "phone": "+91-90000-10006",
+    "city": "Kochi",
+    "createdAt": "2026-04-06T17:05:00Z"
+  }
+]

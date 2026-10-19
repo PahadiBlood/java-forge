@@ -1,0 +1,197 @@
+[
+  {
+    "id": "ORD-2026-0001",
+    "userId": "u-2001",
+    "status": "DELIVERED",
+    "createdAt": "2026-10-19T10:24:00Z",
+    "subtotal": 8867.00,
+    "shipping": 0.00,
+    "total": 8867.00,
+    "items": [
+      { "productId": "p-1001", "quantity": 1, "unitPrice": 7269.00, "lineTotal": 7269.00 },
+      { "productId": "p-1041", "quantity": 2, "unitPrice": 799.00, "lineTotal": 1598.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0002",
+    "userId": "u-2002",
+    "status": "SHIPPED",
+    "createdAt": "2026-10-18T14:08:00Z",
+    "subtotal": 6807.00,
+    "shipping": 99.00,
+    "total": 6906.00,
+    "items": [
+      { "productId": "p-1081", "quantity": 1, "unitPrice": 5649.00, "lineTotal": 5649.00 },
+      { "productId": "p-1122", "quantity": 2, "unitPrice": 579.00, "lineTotal": 1158.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0003",
+    "userId": "u-2003",
+    "status": "PROCESSING",
+    "createdAt": "2026-10-17T07:46:00Z",
+    "subtotal": 16277.00,
+    "shipping": 0.00,
+    "total": 16277.00,
+    "items": [
+      { "productId": "p-1002", "quantity": 1, "unitPrice": 14259.00, "lineTotal": 14259.00 },
+      { "productId": "p-1161", "quantity": 2, "unitPrice": 1009.00, "lineTotal": 2018.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0004",
+    "userId": "u-2004",
+    "status": "CANCELLED",
+    "createdAt": "2026-10-16T16:51:00Z",
+    "subtotal": 7157.00,
+    "shipping": 99.00,
+    "total": 7256.00,
+    "items": [
+      { "productId": "p-1042", "quantity": 2, "unitPrice": 2859.00, "lineTotal": 5718.00 },
+      { "productId": "p-1121", "quantity": 1, "unitPrice": 1439.00, "lineTotal": 1439.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0005",
+    "userId": "u-2005",
+    "status": "RETURNED",
+    "createdAt": "2026-10-14T11:18:00Z",
+    "subtotal": 9258.00,
+    "shipping": 0.00,
+    "total": 9258.00,
+    "items": [
+      { "productId": "p-1082", "quantity": 1, "unitPrice": 7169.00, "lineTotal": 7169.00 },
+      { "productId": "p-1162", "quantity": 1, "unitPrice": 2089.00, "lineTotal": 2089.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0006",
+    "userId": "u-2006",
+    "status": "DELIVERED",
+    "createdAt": "2026-10-12T13:39:00Z",
+    "subtotal": 11586.00,
+    "shipping": 0.00,
+    "total": 11586.00,
+    "items": [
+      { "productId": "p-1121", "quantity": 3, "unitPrice": 1439.00, "lineTotal": 4317.00 },
+      { "productId": "p-1001", "quantity": 1, "unitPrice": 7269.00, "lineTotal": 7269.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0007",
+    "userId": "u-2001",
+    "status": "PROCESSING",
+    "createdAt": "2026-10-10T09:02:00Z",
+    "subtotal": 4977.00,
+    "shipping": 99.00,
+    "total": 5076.00,
+    "items": [
+      { "productId": "p-1162", "quantity": 2, "unitPrice": 2089.00, "lineTotal": 4178.00 },
+      { "productId": "p-1041", "quantity": 1, "unitPrice": 799.00, "lineTotal": 799.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0008",
+    "userId": "u-2002",
+    "status": "DELIVERED",
+    "createdAt": "2026-10-08T18:22:00Z",
+    "subtotal": 14259.00,
+    "shipping": 0.00,
+    "total": 14259.00,
+    "items": [
+      { "productId": "p-1002", "quantity": 1, "unitPrice": 14259.00, "lineTotal": 14259.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0009",
+    "userId": "u-2003",
+    "status": "SHIPPED",
+    "createdAt": "2026-10-05T12:16:00Z",
+    "subtotal": 6228.00,
+    "shipping": 99.00,
+    "total": 6327.00,
+    "items": [
+      { "productId": "p-1081", "quantity": 1, "unitPrice": 5649.00, "lineTotal": 5649.00 },
+      { "productId": "p-1122", "quantity": 1, "unitPrice": 579.00, "lineTotal": 579.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0010",
+    "userId": "u-2004",
+    "status": "PROCESSING",
+    "createdAt": "2026-10-03T08:44:00Z",
+    "subtotal": 5886.00,
+    "shipping": 99.00,
+    "total": 5985.00,
+    "items": [
+      { "productId": "p-1161", "quantity": 3, "unitPrice": 1009.00, "lineTotal": 3027.00 },
+      { "productId": "p-1042", "quantity": 1, "unitPrice": 2859.00, "lineTotal": 2859.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0011",
+    "userId": "u-2005",
+    "status": "DELIVERED",
+    "createdAt": "2026-09-28T15:31:00Z",
+    "subtotal": 21707.00,
+    "shipping": 0.00,
+    "total": 21707.00,
+    "items": [
+      { "productId": "p-1001", "quantity": 2, "unitPrice": 7269.00, "lineTotal": 14538.00 },
+      { "productId": "p-1082", "quantity": 1, "unitPrice": 7169.00, "lineTotal": 7169.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0012",
+    "userId": "u-2006",
+    "status": "CANCELLED",
+    "createdAt": "2026-09-15T10:05:00Z",
+    "subtotal": 3677.00,
+    "shipping": 99.00,
+    "total": 3776.00,
+    "items": [
+      { "productId": "p-1041", "quantity": 1, "unitPrice": 799.00, "lineTotal": 799.00 },
+      { "productId": "p-1121", "quantity": 2, "unitPrice": 1439.00, "lineTotal": 2878.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0013",
+    "userId": "u-2002",
+    "status": "DELIVERED",
+    "createdAt": "2026-08-21T14:11:00Z",
+    "subtotal": 17118.00,
+    "shipping": 0.00,
+    "total": 17118.00,
+    "items": [
+      { "productId": "p-1002", "quantity": 1, "unitPrice": 14259.00, "lineTotal": 14259.00 },
+      { "productId": "p-1042", "quantity": 1, "unitPrice": 2859.00, "lineTotal": 2859.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0014",
+    "userId": "u-2003",
+    "status": "RETURNED",
+    "createdAt": "2026-07-30T09:53:00Z",
+    "subtotal": 7738.00,
+    "shipping": 0.00,
+    "total": 7738.00,
+    "items": [
+      { "productId": "p-1081", "quantity": 1, "unitPrice": 5649.00, "lineTotal": 5649.00 },
+      { "productId": "p-1162", "quantity": 1, "unitPrice": 2089.00, "lineTotal": 2089.00 }
+    ]
+  },
+  {
+    "id": "ORD-2026-0015",
+    "userId": "u-2001",
+    "status": "DELIVERED",
+    "createdAt": "2026-06-12T16:27:00Z",
+    "subtotal": 6465.00,
+    "shipping": 0.00,
+    "total": 6465.00,
+    "items": [
+      { "productId": "p-1122", "quantity": 1, "unitPrice": 579.00, "lineTotal": 579.00 },
+      { "productId": "p-1161", "quantity": 3, "unitPrice": 1009.00, "lineTotal": 3027.00 },
+      { "productId": "p-1042", "quantity": 1, "unitPrice": 2859.00, "lineTotal": 2859.00 }
+    ]
+  }
+]
