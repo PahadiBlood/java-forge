@@ -1,16 +1,19 @@
 package com.mshop.web.api.controller;
 
 import com.mshop.web.api.dto.HomeSection;
+import com.mshop.web.api.dto.HomeSectionsRequest;
+import com.mshop.web.api.dto.ProductListRequest;
 import com.mshop.web.api.dto.ProductResponse;
+import com.mshop.web.api.dto.ProductSearchRequest;
 import com.mshop.web.api.dto.ProductSearchWrapper;
 import com.mshop.web.api.dto.ProductWrapper;
 import com.mshop.web.api.service.impl.ProductServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -30,24 +33,21 @@ public class ProductApiController {
 
     // home page rows: products grouped by category
     @GetMapping("/home/sections")
-    public ResponseEntity<List<HomeSection>> findHomeSections(@RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(productServiceImpl.findHomeSections(size));
+    public ResponseEntity<List<HomeSection>> findHomeSections(@ModelAttribute HomeSectionsRequest request) {
+        return ResponseEntity.ok(productServiceImpl.findHomeSections(request.getSize()));
     }
 
     // find all products (paged, optional category filter)
     @GetMapping("/products")
-    public ResponseEntity<ProductWrapper> findAllProducts(@RequestParam(required = false) String category,
-                                                          @RequestParam(defaultValue = "0") int page,
-                                                          @RequestParam(defaultValue = "15") int size) {
-        return ResponseEntity.ok(productServiceImpl.findAllProducts(category, page, size));
+    public ResponseEntity<ProductWrapper> findAllProducts(@ModelAttribute ProductListRequest request) {
+        return ResponseEntity.ok(productServiceImpl.findAllProducts(
+                request.getCategory(), request.getPage(), request.getSize()));
     }
 
     @GetMapping("/products/search")
-    public ResponseEntity<ProductSearchWrapper> searchProducts(@RequestParam(defaultValue = "") String search,
-                                                               @RequestParam(defaultValue = "0") int page,
-                                                               @RequestParam(defaultValue = "15") int size,
-                                                               @RequestParam(defaultValue = "relevance") String sort) {
-        return ResponseEntity.ok(productServiceImpl.searchProducts(page, size, sort, search));
+    public ResponseEntity<ProductSearchWrapper> searchProducts(@ModelAttribute ProductSearchRequest request) {
+        return ResponseEntity.ok(productServiceImpl.searchProducts(
+                request.getPage(), request.getSize(), request.getSort(), request.getSearch()));
     }
 
     // find product by id
