@@ -3,7 +3,6 @@
   const id = decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || '');
   const box = $('#product'), summary = $('#summary'), list = $('#reviews'), pager = $('#pager');
   const reviewSort = $('#sort-reviews');
-  let reviews = [];
 
   async function loadProduct() {
     try {
@@ -23,14 +22,16 @@
     }
   }
 
-  function renderReviews(page, scroll) {
-    const sorted = [...reviews];
-    if (reviewSort.value === 'newest') sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    if (reviewSort.value === 'oldest') sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    if (reviewSort.value === 'rating-desc') sorted.sort((a, b) => Number(b.rating) - Number(a.rating));
-    if (reviewSort.value === 'rating-asc') sorted.sort((a, b) => Number(a.rating) - Number(b.rating));
-    const pageReviews = sorted.slice(page * SIZE, (page + 1) * SIZE);
-    list.innerHTML = pageReviews.map((r) => `
+  async function loadReviews(page, scroll) {
+    try {
+      const params = new URLSearchParams({ page: String(page), size: String(SIZE), sort: reviewSort.value });
+      const data = await getJSON(`/api/products/${encodeURIComponent(id)}/reviews?${params}`);
+      const s = data.summary || {};
+      summary.innerHTML = s.count
+        ? `<div class="big">${Number(s.average).toFixed(1)}</div>
+           <div><div class="stars">${stars(s.average)}</div><div class="muted">${s.count} reviews</div></div>`
+        : '<div class="muted">No reviews yet.</div>';
+      list.innerHTML = data.items.map((r) => `
         <article class="review fade">
           <div class="review-top">
             <div class="avatar">${esc((r.author || '?')[0])}</div>
@@ -40,21 +41,9 @@
           </div>
           <p>${esc(r.comment)}</p>
         </article>`).join('');
-    if (!pageReviews.length) list.innerHTML = '<div class="notice">No reviews yet.</div>';
-    renderPager(pager, page, Math.ceil(reviews.length / SIZE), (target) => renderReviews(target, true));
-    if (scroll) $('.reviews').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  async function loadReviews(page, scroll) {
-    try {
-      const data = await getJSON(`/api/products/${encodeURIComponent(id)}/reviews?page=0&size=500`);
-      const s = data.summary || {};
-      summary.innerHTML = s.count
-        ? `<div class="big">${Number(s.average).toFixed(1)}</div>
-           <div><div class="stars">${stars(s.average)}</div><div class="muted">${s.count} reviews</div></div>`
-        : '<div class="muted">No reviews yet.</div>';
-      reviews = data.items || [];
-      renderReviews(page, scroll);
+      if (!data.items.length) list.innerHTML = '<div class="notice">No reviews yet.</div>';
+      renderPager(pager, data.page, data.totalPages, (target) => loadReviews(target, true));
+      if (scroll) $('.reviews').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       pager.innerHTML = '';
       showError(list, 'Could not load reviews. Implement GET /api/products/{id}/reviews. (' + e.message + ')');
@@ -62,6 +51,6 @@
   }
 
   loadProduct();
-  reviewSort.addEventListener('change', () => renderReviews(0, false));
+  reviewSort.addEventListener('change', () => loadReviews(0, false));
   loadReviews(0, false);
 })();
