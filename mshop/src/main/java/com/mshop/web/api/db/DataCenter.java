@@ -21,9 +21,13 @@ public class DataCenter {
     private final ExecutorService service = Executors.newFixedThreadPool(2);
 
     private final ObjectMapper objectMapper;
+    public final CompletableFuture<List<Product>> readProductsAsync;
+    public final CompletableFuture<List<Review>> readReviewsAsync;
 
     public DataCenter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.readProductsAsync = CompletableFuture.supplyAsync(this::readProducts, service);
+        this.readReviewsAsync = CompletableFuture.supplyAsync(this::readReviews, service);
     }
 
     public List<Product> readProducts() {
@@ -46,6 +50,4 @@ public class DataCenter {
         }
     }
 
-    public CompletableFuture<List<Product>> readProductsAsync = CompletableFuture.supplyAsync(this::readProducts, service);
-    public CompletableFuture<List<Review>> readReviewsAsync = CompletableFuture.supplyAsync(this::readReviews, service);
 }
