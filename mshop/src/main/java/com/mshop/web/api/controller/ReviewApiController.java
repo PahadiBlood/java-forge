@@ -21,7 +21,7 @@ public class ReviewApiController {
     // find reviews by product id (paged)
     @GetMapping("/products/{id}/reviews")
     public ResponseEntity<ReviewWrapper> findReviewsByProductId(@PathVariable String id,
-                                                                 @ModelAttribute ReviewListRequest request) {
+                                                                @ModelAttribute ReviewListRequest request) {
         return ResponseEntity.ok(reviewServiceImpl.findReviewsByProductId(
                 id, request.getPage(), request.getSize(), request.getSort()));
     }
