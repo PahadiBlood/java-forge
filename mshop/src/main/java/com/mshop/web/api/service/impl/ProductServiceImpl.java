@@ -4,39 +4,19 @@ import com.mshop.web.api.db.DataCenter;
 import com.mshop.web.api.dto.*;
 import com.mshop.web.api.modal.Product;
 import com.mshop.web.api.modal.Review;
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-@RequiredArgsConstructor
 @Service
 public class ProductServiceImpl {
+    private final List<Product> products;
+    private final List<Review> reviews;
 
-    private final DataCenter dataCenter;
-    private static List<Product> products;
-    private static List<Review> reviews;
-
-    @PostConstruct
-    void init() {
-        // the problem with this data read and initialization is if data is too heavy
-        // it will delay whole application startup
-
-        // copyonwritearraylist can be ignored as we are not updating product list
-//        products = new CopyOnWriteArrayList<>(dataCenter.readProducts());
-//        reviews = new CopyOnWriteArrayList<>(dataCenter.readReviews());
-
-        var productsAsync = dataCenter.readProductsAsync;
-        var reviewsAsync = dataCenter.readReviewsAsync;
-        try {
-            products = productsAsync.get();
-            reviews = reviewsAsync.get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+    public ProductServiceImpl(DataCenter dataCenter) {
+        products = dataCenter.getProducts();
+        reviews = dataCenter.getReviews();
     }
 
     public List<String> findAllCategories() {
@@ -49,10 +29,10 @@ public class ProductServiceImpl {
 
     public List<HomeSection> findHomeSections(int size) {
         System.out.println("Total size asked " + size);
-        var products = ProductServiceImpl.products.stream().collect(Collectors.groupingBy(Product::getCategory));
+        var productsGroups = products.stream().collect(Collectors.groupingBy(Product::getCategory));
 
         //optimize it with teeing collector
-        return products
+        return productsGroups
                 .entrySet()
                 .stream()
                 .map(e -> {
@@ -169,7 +149,7 @@ public class ProductServiceImpl {
         return new ProductSearchWrapper(productsResponse, page, size, totalPages, totalItems);
     }
 
-    private static List<Product> getSearchProducts(String sort, String search) {
+    private List<Product> getSearchProducts(String sort, String search) {
         var searchChain = products
                 .stream()
                 .filter(product -> !search.isBlank() && (
