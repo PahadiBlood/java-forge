@@ -3,8 +3,10 @@ package com.mshop.web.api.db;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mshop.web.api.modal.Order;
 import com.mshop.web.api.modal.Product;
 import com.mshop.web.api.modal.Review;
+import com.mshop.web.api.modal.User;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,10 @@ public final class DataCenter {
     private final List<Product> products = new CopyOnWriteArrayList<>();
     @Getter
     private final List<Review> reviews = new CopyOnWriteArrayList<>();
+    @Getter
+    private final List<Order> orders;
+    @Getter
+    private final List<User> users;
 
     @PostConstruct
     void init() {
@@ -116,6 +122,28 @@ public final class DataCenter {
         return reviews;
     }
 
+    private List<User> readUsers() throws IOException {
+        var users = new ArrayList<User>();
+        try (JsonParser parser = mapper.getFactory().createParser(new ClassPathResource("data/users.json").getInputStream())) {
+            parser.nextToken();
+            while (parser.nextToken() == JsonToken.START_OBJECT) {
+                users.add(mapper.readValue(parser, User.class));
+            }
+        }
+        return users;
+    }
+
+    private List<Order> readOrders() throws IOException {
+        var orders = new ArrayList<Order>();
+        try (JsonParser parser = mapper.getFactory().createParser(new ClassPathResource("data/orders.json").getInputStream())) {
+            parser.nextToken();
+            while (parser.nextToken() == JsonToken.START_OBJECT) {
+                orders.add(mapper.readValue(parser, Order.class));
+            }
+        }
+        return orders;
+    }
+
     public void loadRestData() {
         var productsAsync = CompletableFuture.supplyAsync(() -> {
             try {
@@ -133,10 +161,25 @@ public final class DataCenter {
             }
         }, service).thenAccept(reviews::addAll);
 
-        CompletableFuture.allOf(productsAsync, reviewsAsync)
+        var usersAsync = CompletableFuture.supplyAsync(() -> {
+            try {
+                return readUsers();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, service).thenAccept(users::addAll);
+
+        var ordersAsync = CompletableFuture.supplyAsync(() -> {
+            try {
+                return readOrders();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, service).thenAccept(orders::addAll);
+
+        CompletableFuture.allOf(productsAsync, reviewsAsync, usersAsync, ordersAsync)
                 .whenComplete((result, ex) -> {
                     service.shutdown();
-                    //todo: handle exception in clean way and add retry
                     if (ex != null) {
                         ex.printStackTrace();
                     }
