@@ -111,6 +111,8 @@ Java reads those files when the app starts. `DataCenter` reads the two files at 
 
 The shop has a home page, a page for one category, and a page for one product.
 
+The API also includes paged product and review results, product search, and admin endpoints for dashboard summaries and order lookup. The admin routes are documented in [the mshop README](mshop/README.md).
+
 ### Run
 
 From the `mshop` folder:
