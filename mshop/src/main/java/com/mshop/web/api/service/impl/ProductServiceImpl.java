@@ -29,10 +29,11 @@ public class ProductServiceImpl {
     }
 
     public List<HomeSection> findHomeSections(int size) {
-        size = Math.max(1, Math.min(size, 100));
+        size = Math.clamp(size, 1, 100);
         var productsGroups = products.stream().collect(Collectors.groupingBy(Product::getCategory));
 
         //optimize it with teeing collector
+        int finalSize = size;
         return productsGroups
                 .entrySet()
                 .stream()
@@ -48,7 +49,7 @@ public class ProductServiceImpl {
                                     p.getPrice(),
                                     p.getImageUrl()
                             ))
-                            .limit(size)
+                            .limit(finalSize)
                             .toList();
 
                     return new HomeSection(e.getKey(), allProductsCount, limitedProducts);
