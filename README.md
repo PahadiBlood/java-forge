@@ -109,9 +109,7 @@ mShop is a learning project. It looks like a small shop. There is no database. T
 
 Java reads those files when the app starts. `DataCenter` reads the two files at the same time. It uses a pool of two threads and `CompletableFuture`. The services then use streams to filter, group, and page the lists. That is the lesson: streams and threads on real lists you can open in a browser.
 
-The shop has a home page, a page for one category, and a page for one product.
-
-The API also includes paged product and review results, product search, and admin endpoints for dashboard summaries and order lookup. The admin routes are documented in [the mshop README](mshop/README.md).
+The storefront has a home page, category listings, product detail pages with ratings and reviews, a searchable catalog, and an admin dashboard. Category and search pages support sorting and paging. The admin dashboard shows sales, order status, category revenue, top customers, and searchable orders. Product, review, customer, and order data come from JSON files. See [the mshop guide](mshop/README.md) for page behavior and API details.
 
 ### Run
 

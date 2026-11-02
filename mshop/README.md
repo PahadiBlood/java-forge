@@ -1,6 +1,6 @@
 # mShop
 
-mShop is a small shop you open in a browser. It has a home page, a page for one category, and a page for one product.
+mShop is a browser shop with a home page, category listing pages, product detail pages, search, and an admin dashboard.
 
 There is no database. Products and reviews live in JSON files. Spring Boot reads those files. The browser asks for JSON. Java sends JSON back. The page script draws the cards.
 
@@ -20,7 +20,7 @@ Open http://localhost:8888
 
 The port is 8888. `application.yml` sets `server.port` to 8888.
 
-The API serves categories, home rows, products, product reviews, and admin dashboard data. Product, review, order, and customer records load from JSON files at startup.
+The API serves categories, home rows, products, product search, product reviews, and admin dashboard data. Product, review, order, and customer records load from JSON files at startup.
 
 ## How a page loads
 
@@ -40,12 +40,14 @@ Every page loads the nav from `GET /api/categories`.
 | --- | --- |
 | `PageController` | Returns the HTML shell for `/`, `/category/{name}`, and `/product/{id}` |
 | `static/js` | Calls the API and draws the page |
-| `data/products.json` | 200 products. 5 categories. 40 products in each category |
-| `data/reviews.json` | Reviews. Each review points at a product with `productId` |
+| `data/products.json` | Product catalog, grouped into categories |
+| `data/reviews.json` | Product reviews and ratings. Each review points at a product with `productId` |
+| `data/users.json` | Sample customer profiles for the dashboard |
+| `data/orders.json` | Sample orders used by the dashboard |
 | `DataCenter` | Reads the JSON files with Jackson |
 | `Product` and `Review` | The objects Jackson builds from those files |
-| `ProductServiceImpl` | Holds the product list. Builds the category names and the home rows |
-| `ProductApiController` | The product HTTP API |
+| `ProductServiceImpl` | Builds category rows, filtered listings, search results, and product details |
+| `ProductApiController` | Category, home, product listing, search, and detail APIs |
 | `ReviewApiController` | The paged review HTTP API |
 | `AdminDashboardApiController` | Dashboard summary and order list/detail APIs |
 | `dto` | The JSON shapes the browser reads |
@@ -57,8 +59,10 @@ The home-row note is next to the service: [01_home_sections.md](src/main/java/co
 | URL | Template | What the script asks for |
 | --- | --- | --- |
 | `/` | `home.html` | `GET /api/home/sections?size=10` |
-| `/category/{name}` | `category.html` | `GET /api/products?category={name}&page=&size=12` |
+| `/category/{name}` | `category.html` | `GET /api/products?category={name}&page=0&size=12` |
+| `/search?search={words}` | `search.html` | `GET /api/products/search?search={words}&page=0&size=12&sort=relevance` |
 | `/product/{id}` | `product.html` | `GET /api/products/{id}` and `GET /api/products/{id}/reviews?page=0&size=5` |
+| `/dashboard` | `dashboard.html` | Admin summary and order list endpoints |
 
 `{name}` and `{id}` come from the URL. The category page reads `Electronics` from `/category/Electronics`. The product page reads `p-1001` from `/product/p-1001`.
 
@@ -190,6 +194,22 @@ This call returns one page of reviews, plus a summary. The product page calls it
 `product.js` reads `summary`, `items`, `page`, and `totalPages`. The items are reviews. A list of products does not work here.
 
 The service returns review pages and the average rating and count for that product.
+
+## Listing, search, and ratings
+
+The category listing reads the category name from the URL. It requests products in that category, shows the total count, sorts products by featured order, name, or price, and provides page buttons. The API page index starts at zero; the category page displays page numbers starting at one.
+
+The header search box shows matching suggestions while the user types. Selecting a suggestion opens its product detail page. Pressing Enter opens `/search?search=...`, where the full matching catalog can be sorted by relevance, name, or price and browsed page by page. Search checks product names, categories, and descriptions. Relevance puts exact and partial name matches before category and description matches.
+
+The product detail page shows the product image, category link, price, and description. Its ratings and reviews area shows the average star rating and review count, then a paged list of reviews. Reviews can be sorted newest, oldest, highest rating, or lowest rating. Products without reviews show an empty state and a zero average.
+
+`ProductReviewSummary` appears in listing and review responses. For a category listing it summarizes reviews for products in that category; on a product page it summarizes reviews for that product. An average of zero with a count of zero means there are no reviews.
+
+## Dashboard page
+
+Open `/dashboard` to view the sample shop metrics. The range selector requests 7, 30, or 90 days. The page shows total sales metrics, order statuses, category revenue, top customers, and an order table. Search matches order ids or customer details. Status and sort filters update the paged order list.
+
+The order list accepts `status`, `search`, `page`, `size`, and `sort`. Page numbers start at zero and the service caps page size at 100. The order detail API returns an order with customer and product names for client use.
 
 ## Admin API
 
