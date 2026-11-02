@@ -7,6 +7,7 @@ import com.mshop.web.api.dto.ReviewWrapper;
 import com.mshop.web.api.modal.Review;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -25,6 +26,7 @@ public class ReviewServiceImpl {
     public ReviewWrapper findReviewsByProductId(String id, int page, int size, String sort) {
         if (page < 0) page = 0;
         if (size < 1) size = 5;
+        size = Math.min(size, 100);
 
         var reviewsByProductId = reviews
                 .stream()
@@ -56,7 +58,7 @@ public class ReviewServiceImpl {
 
         return new ReviewWrapper(
                 filteredReviewsByProductId, page, size, totalPages, totalItems,
-                new ProductReviewSummary(summary.getAverage(), summary.getCount())
+                new ProductReviewSummary(summary.getCount() == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(summary.getAverage()), summary.getCount())
         );
     }
 

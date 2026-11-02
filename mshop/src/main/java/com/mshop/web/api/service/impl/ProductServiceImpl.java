@@ -6,6 +6,7 @@ import com.mshop.web.api.modal.Product;
 import com.mshop.web.api.modal.Review;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,7 +29,7 @@ public class ProductServiceImpl {
     }
 
     public List<HomeSection> findHomeSections(int size) {
-        System.out.println("Total size asked " + size);
+        size = Math.max(1, Math.min(size, 100));
         var productsGroups = products.stream().collect(Collectors.groupingBy(Product::getCategory));
 
         //optimize it with teeing collector
@@ -57,29 +58,14 @@ public class ProductServiceImpl {
     public ProductWrapper findAllProducts(String category, int page, int size) {
         if (page < 0) page = 0;
         if (size < 1) size = 15;
-//        var productsByCategory = products
-//                .stream()
-//                .filter(p -> (category == null || category.isBlank() || p.getCategory().equalsIgnoreCase(category)))
-//                .toList();
-
-        final Set<String> productIds = new HashSet<>();
-        List<Product> productsByCategory;
-        if (category == null || category.isBlank()) {
-            productsByCategory = products;
-        } else {
-            productsByCategory = new ArrayList<>();
-            products.forEach(p -> {
-                if (p.getCategory().equalsIgnoreCase(category)) {
-                    productsByCategory.add(p);
-                    productIds.add(p.getId());
-                }
-            });
-        }
+        size = Math.min(size, 100);
+        List<Product> productsByCategory = products.stream()
+                .filter(p -> category == null || category.isBlank() || p.getCategory().equalsIgnoreCase(category)).toList();
 
         long totalItems = productsByCategory.size();
         int totalPages = (int) Math.ceil((double) totalItems / size);
 
-        // TODO:  Read reviews average and total based on category products
+        Set<String> productIds = productsByCategory.stream().map(Product::getId).collect(Collectors.toSet());
         var res = reviews
                 .stream()
                 .filter(r -> productIds.contains(r.getProductId()))
@@ -101,7 +87,7 @@ public class ProductServiceImpl {
 
         return new ProductWrapper(
                 productByCategoryPageSize, page, size, totalPages, totalItems,
-                new ProductReviewSummary(res.getAverage(), res.getCount())
+                new ProductReviewSummary(BigDecimal.valueOf(res.getAverage()), res.getCount())
         );
     }
 
@@ -124,6 +110,7 @@ public class ProductServiceImpl {
     public ProductSearchWrapper searchProducts(int page, int size, String sort, String search) {
         if (page < 0) page = 0;
         if (size < 1) size = 15;
+        size = Math.min(size, 100);
 
         search = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
 
@@ -161,8 +148,8 @@ public class ProductServiceImpl {
         if (sort != null && !sort.isBlank() && !"relevance".equalsIgnoreCase(sort)) {
             Comparator<Product> sortFunction = switch (sort.toLowerCase(Locale.ROOT)) {
                 case "name-asc" -> (o1, o2) -> o1.getName().compareToIgnoreCase(o2.getName());
-                case "price-asc" -> Comparator.comparingDouble(Product::getPrice);
-                case "price-desc" -> Comparator.comparingDouble(Product::getPrice).reversed();
+                case "price-asc" -> Comparator.nullsLast(Comparator.comparing(Product::getPrice));
+                case "price-desc" -> Comparator.nullsLast(Comparator.comparing(Product::getPrice).reversed());
                 default -> null;
             };
 

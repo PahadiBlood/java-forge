@@ -1,7 +1,9 @@
 package com.mshop.web.api.dto;
 
+import java.math.BigDecimal;
+
 public record ProductReviewSummary(
-        double average,
+        BigDecimal average,
         long count
 ) {
 }

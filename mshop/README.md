@@ -20,7 +20,7 @@ Open http://localhost:8888
 
 The port is 8888. `application.yml` sets `server.port` to 8888.
 
-Two API calls return data today. Those are the category names and the home rows. The product list, the single product, and the reviews still return `null`. The page shows "could not load" for a call that returns `null`.
+The API serves categories, home rows, products, product reviews, and admin dashboard data. Product, review, order, and customer records load from JSON files at startup.
 
 ## How a page loads
 
@@ -46,7 +46,8 @@ Every page loads the nav from `GET /api/categories`.
 | `Product` and `Review` | The objects Jackson builds from those files |
 | `ProductServiceImpl` | Holds the product list. Builds the category names and the home rows |
 | `ProductApiController` | The product HTTP API |
-| `ReviewApiController` | The review HTTP API. This method still returns `null` |
+| `ReviewApiController` | The paged review HTTP API |
+| `AdminDashboardApiController` | Dashboard summary and order list/detail APIs |
 | `dto` | The JSON shapes the browser reads |
 
 The home-row note is next to the service: [01_home_sections.md](src/main/java/com/mshop/web/api/service/impl/notes/01_home_sections.md).
@@ -159,7 +160,7 @@ This call returns one page of products. The category page calls it with `size=12
 
 `category.js` reads `items`, `totalItems`, `page`, and `totalPages`. A bare array does not work. The script looks for `data.items`.
 
-This method still returns `null`. The category page shows "could not load" until it returns the page object.
+The service returns a page object with the selected products and review summary for those products.
 
 ### `GET /api/products/{id}`
 
@@ -167,7 +168,7 @@ This call returns one product object. The same fields as a product in the JSON f
 
 `product.js` reads `name`, `imageUrl`, `category`, `price`, and `description` on the root object. A list, or a wrapper around the product, does not work. The script reads `p.name` on the body itself.
 
-This method still returns `null`.
+The service returns the matching product or a not-found error.
 
 ### `GET /api/products/{id}/reviews?page=&size=`
 
@@ -188,4 +189,10 @@ This call returns one page of reviews, plus a summary. The product page calls it
 
 `product.js` reads `summary`, `items`, `page`, and `totalPages`. The items are reviews. A list of products does not work here.
 
-This method still returns `null`.
+The service returns review pages and the average rating and count for that product.
+
+## Admin API
+
+`GET /api/admin/dashboard/summary?days=30` returns order counts, sales, delivered order average, category revenue, and the five highest spending customers.
+
+`GET /api/admin/orders` accepts `status`, `search`, `page`, `size`, and `sort` (for example `createdAt,desc`). `GET /api/admin/orders/{id}` returns one order with customer and product details. Pages start at zero; page size is limited to 100. Unknown order ids produce a not-found error.

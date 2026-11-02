@@ -1,4 +1,6 @@
 package com.mshop.web.api.dto;
 
-public record OrderItemCategory() {
+import java.math.BigDecimal;
+
+public record OrderItemCategory(String category, BigDecimal lineTotal) {
 }
